@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色：admin=管理员, user=普通用户',
     status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态：active=启用, disabled=禁用',
     avatar VARCHAR(500) DEFAULT '' COMMENT '头像URL（预留）',
-    email VARCHAR(100) DEFAULT '' COMMENT '邮箱（预留）',
+    email VARCHAR(100) DEFAULT '' COMMENT '邮箱（登录账号）',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
@@ -62,3 +62,29 @@ INSERT INTO words (list_id, word, phonetic, meaning, example, example_translatio
 (1, 'happiness', '/ˈhæpinəs/', '幸福；快乐', 'Money cannot buy happiness.', '金钱买不到幸福。'),
 (1, 'important', '/ɪmˈpɔːrtnt/', '重要的', 'This meeting is very important.', '这次会议非常重要。'),
 (1, 'journey', '/ˈdʒɜːrni/', '旅程', 'Life is a long journey.', '人生是一段漫长的旅程。');
+
+-- ===== 用户收藏表 =====
+-- 记录用户收藏的单词，同一用户不能重复收藏同一单词
+CREATE TABLE IF NOT EXISTS favorites (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '收藏ID',
+    user_id INT NOT NULL COMMENT '用户ID',
+    word_id INT NOT NULL COMMENT '单词ID',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    UNIQUE KEY unique_user_word_favorite (user_id, word_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户收藏表';
+
+-- ===== 用户错题本表 =====
+-- 记录用户的错题及错误次数，同一用户不能重复记录同一单词
+CREATE TABLE IF NOT EXISTS mistakes (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '错题ID',
+    user_id INT NOT NULL COMMENT '用户ID',
+    word_id INT NOT NULL COMMENT '单词ID',
+    mistake_count INT NOT NULL DEFAULT 1 COMMENT '错误次数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '首次错误时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后错误时间',
+    UNIQUE KEY unique_user_word_mistake (user_id, word_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户错题本表';

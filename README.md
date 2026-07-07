@@ -1,57 +1,69 @@
 # 英语单词学习系统
 
-这是一个基于 FastAPI + Vue.js 的英语单词在线学习网站。
+基于 **FastAPI + Vue.js 3** 的英语单词在线学习平台，支持多模式学习、AI 辅助、用户管理、后台管理等功能。
+
+---
 
 ## 项目结构
 
 ```
 网页测试/
-├── backend/                 # 后端目录
-│   ├── app/                # 应用代码
-│   │   ├── routes/         # API 路由
-│   │   ├── database.py     # 数据库配置
-│   │   └── models.py       # 数据模型
-│   ├── main.py             # 主应用入口
-│   └── requirements.txt    # Python 依赖包
-├── frontend/               # 前端目录
-│   ├── index.html          # 主页面
-│   └── static/             # 静态资源
-└── w_init.sql              # 数据库初始化脚本
+├── backend/                    # 后端目录
+│   ├── app/                    # 应用代码
+│   │   ├── routes/             # API 路由模块
+│   │   │   ├── ai.py           # AI 功能接口
+│   │   │   ├── auth.py         # 认证（登录/注册）接口
+│   │   │   ├── favorites.py    # 收藏功能接口
+│   │   │   ├── management.py   # 后台管理接口（词表/单词 CRUD）
+│   │   │   ├── mistakes.py     # 错题本接口
+│   │   │   ├── users.py        # 用户管理接口
+│   │   │   └── words.py        # 单词学习接口
+│   │   ├── ai_service.py       # AI 服务封装（智谱 GLM）
+│   │   ├── database.py         # 数据库连接配置
+│   │   └── models.py           # SQLAlchemy 数据模型
+│   ├── static/                 # 管理端页面
+│   │   ├── login.html          # 管理员登录页
+│   │   ├── management.html     # 管理后台首页
+│   │   ├── management_users.html
+│   │   └── management_words.html
+│   ├── main.py                 # FastAPI 主应用入口
+│   ├── requirements.txt        # Python 依赖
+│   └── start.py                # 后端启动脚本
+├── frontend/                   # 前端目录
+│   ├── index.html              # 主学习页面（Vue.js 单页应用）
+│   └── start.py                # 前端启动脚本
+└── w_init.sql                  # 数据库初始化脚本
 ```
+
+---
 
 ## 前置要求
 
-1. **Python 3.8+**
-2. **MySQL 数据库**
-3. **现代浏览器**（Chrome、Firefox、Edge 等）
+- **Python 3.8+**
+- **MySQL 5.7+**（推荐 8.0）
+- **现代浏览器**（Chrome / Firefox / Edge）
+
+---
 
 ## 安装步骤
 
 ### 1. 初始化数据库
 
-在 MySQL 中执行初始化脚本：
-
 ```bash
 mysql -u root -p < w_init.sql
 ```
 
-或者在 MySQL 客户端中直接运行 `w_init.sql` 文件的内容。
+或在 MySQL 客户端中直接运行 `w_init.sql` 文件内容。
 
 ### 2. 配置数据库连接
 
-编辑 `backend/app/database.py` 文件，修改数据库连接字符串：
+编辑 `backend/app/database.py`，修改连接字符串：
 
 ```python
 DATABASE_URL = "mysql+pymysql://用户名:密码@主机:端口/word_learning"
 ```
 
-将 `用户名`、`密码`、`主机`、`端口` 替换为你的 MySQL 配置。
-
-默认配置：
-- 用户名：root
-- 密码：root
-- 主机：localhost
-- 端口：3306
+默认配置：用户名 `root`，密码 `root`，主机 `localhost`，端口 `3306`
 
 ### 3. 安装后端依赖
 
@@ -67,119 +79,115 @@ cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-后端将在 `http://localhost:8000` 运行。
+或使用启动脚本：
 
-### 5. 访问前端
+```bash
+cd backend
+python start.py
+```
 
-直接在浏览器中打开 `frontend/index.html` 文件即可。
-
-或者使用简单的 HTTP 服务器：
+### 5. 启动前端
 
 ```bash
 cd frontend
-python -m http.server 3000
+python start.py
 ```
 
-然后在浏览器中访问 `http://localhost:3000`
+或直接用浏览器打开 `frontend/index.html`。
 
-## API 接口说明
+---
 
-FastAPI 会自动生成交互式 API 文档，访问以下地址查看：
+## 功能说明
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+### 学习端（用户）
 
-### 主要接口
+| 功能 | 说明 |
+|------|------|
+| 卡片模式 | 展示单词、音标、释义、例句，支持上下导航 |
+| 拼写模式 | 交互式字母格拼写，支持逐字母揭示 |
+| 随机模式 | 随机打乱单词顺序练习 |
+| 单词收藏 | 一键收藏/取消收藏，查看收藏列表 |
+| 错题本 | 自动记录错误次数，答对自动减少，归零后移出 |
+| AI 讲解 | 调用智谱 GLM 大模型，支持词根分析、例句生成、自由问答 |
+| 用户注册/登录 | 邮箱注册，支持个人信息修改 |
 
-1. **获取当前单词**
-   - GET `/api/words/current`
-   - 返回第一个单词
+### 管理端（管理员）
 
-2. **根据 ID 获取单词**
-   - GET `/api/words/{word_id}`
-   - 参数：word_id - 单词 ID
+| 功能 | 说明 |
+|------|------|
+| 词表管理 | 创建/编辑/删除词表，查看词表单词数量 |
+| 单词管理 | 单词增删改查，支持批量添加 |
+| 用户管理 | 查看用户列表，启禁用账号，修改角色 |
 
-3. **获取下一个单词**
-   - GET `/api/words/next/{current_id}`
-   - 参数：current_id - 当前单词 ID
+---
 
-4. **获取上一个单词**
-   - GET `/api/words/prev/{current_id}`
-   - 参数：current_id - 当前单词 ID
+## API 接口
 
-5. **获取单词总数**
-   - GET `/api/words/count`
-   - 返回：{total: 数量}
+FastAPI 自动生成 Swagger 文档：http://localhost:8000/docs
 
-6. **获取首尾单词 ID**
-   - GET `/api/words/first-last`
-   - 返回：{first_id: 第一个ID, last_id: 最后一个ID}
+### 接口分组
+
+| 前缀 | 说明 |
+|------|------|
+| `/api/words` | 单词学习（获取当前/上/下一个单词、单词总数等） |
+| `/api/auth` | 认证（登录、注册、获取/更新个人信息） |
+| `/api/favorites` | 收藏（切换收藏、检查状态、收藏列表） |
+| `/api/mistakes` | 错题本（添加/减少错误、错题列表、移除错题） |
+| `/api/ai` | AI 功能（单词解释、生成例句、自由问答） |
+| `/api/management` | 后台管理（词表 CRUD、单词 CRUD、批量添加） |
+| `/api/management/users` | 用户管理（增删改查） |
+
+---
 
 ## 技术栈
 
 ### 后端
-- **FastAPI**: 高性能 Python Web 框架
-- **SQLAlchemy**: Python ORM 框架
-- **PyMySQL**: MySQL 数据库驱动
-- **Uvicorn**: ASGI 服务器
+- **FastAPI** — 高性能 Python Web 框架，自动生成 API 文档
+- **SQLAlchemy** — ORM 模型层，支持外键关联与级联删除
+- **PyMySQL** — MySQL 数据库驱动
+- **Uvicorn** — ASGI 服务器
 
 ### 前端
-- **Vue.js 3**: 渐进式 JavaScript 框架
-- **Axios**: HTTP 客户端
-- **原生 CSS**: 样式设计
+- **Vue.js 3** — 渐进式前端框架（CDN 引入）
+- **Axios** — HTTP 请求客户端
+- **原生 CSS** — 响应式布局，三栏设计
 
-## 功能特点
+### AI
+- **智谱 GLM-4-Flash** — 大语言模型，提供单词讲解与问答能力
 
-✅ 显示单词、音标、释义和例句
-✅ 通过左右按钮切换单词
-✅ 第一个单词时禁用"上一个"按钮
-✅ 最后一个单词时禁用"下一个"按钮
-✅ 显示当前进度（第 X / 总数 个单词）
-✅ 响应式设计，适配移动端
-✅ 美观的渐变背景设计
+### 数据库
+- **MySQL** — 6 张核心表：users、word_lists、words、favorites、mistakes
 
-## 开发说明
+---
 
-### FastAPI 核心概念
-
-1. **路由（Router）**: 定义 URL 和处理函数的映射关系
-2. **依赖注入（Dependency Injection）**: 通过 `Depends()` 实现，如数据库会话
-3. **自动文档**: FastAPI 自动生成 OpenAPI 文档
-4. **异步支持**: 原生支持 async/await
-
-### 项目架构
+## 数据库设计
 
 ```
-请求流程：
-前端 (Vue.js) 
-  ↓ HTTP 请求
-后端 API (FastAPI)
-  ↓ 路由处理
-业务逻辑 (routes/)
-  ↓ 数据库操作
-ORM 模型 (models.py)
-  ↓ SQL 查询
-MySQL 数据库
+users           用户表（账号、角色、状态）
+word_lists      词表分类表
+words           单词表（词、音标、释义、例句、例句翻译）
+favorites       用户收藏表（user_id + word_id 联合唯一）
+mistakes        错题本表（user_id + word_id 联合唯一，记录错误次数）
 ```
+
+---
+
+## 默认账号
+
+| 账号           | 密码 | 角色 |
+|--------------|------|------|
+| admin | 123456 | 管理员 |
+| zhangsan@qq.com| 123456 | 普通用户 |
+| lisi@qq.com  | 123456 | 普通用户 |
+
+---
 
 ## 常见问题
 
-### 1. 数据库连接失败
+**数据库连接失败**：检查 `database.py` 配置，确保 MySQL 服务正在运行。
 
-检查 `database.py` 中的连接配置是否正确，确保 MySQL 服务正在运行。
+**跨域问题**：后端已配置 CORS 允许所有来源，生产环境请限制为具体域名。
 
-### 2. 跨域问题
+**模块导入错误**：确保在 `backend` 目录下运行。
 
-后端已配置 CORS，允许所有来源访问。生产环境应该限制为具体域名。
-
-### 3. 模块导入错误
-
-确保在 `backend` 目录下运行，或者将 `backend` 添加到 Python 路径。
-
-## 下一步扩展
-
-- [ ] 记录学习进度
-- [ ] 添加单词发音功能
-- [ ] 实现单词搜索
-- [ ] 添加收藏功能
-- [ ] 统计学习数据
+**自动迁移**：后端启动时会自动检测并创建缺失的表和字段，无需手动执行 SQL。
