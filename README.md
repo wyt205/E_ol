@@ -76,13 +76,6 @@ pip install -r requirements.txt
 
 ```bash
 cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-或使用启动脚本：
-
-```bash
-cd backend
 python start.py
 ```
 
