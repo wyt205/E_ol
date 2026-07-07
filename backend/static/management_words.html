@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词管理 - 管理后台</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+        /* ===== 顶部导航栏 ===== */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 0 30px; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;
+        }
+        .navbar-left { display: flex; align-items: center; gap: 20px; }
+        .navbar-back {
+            color: white; text-decoration: none; font-size: 0.9em;
+            background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .navbar-back:hover { background: rgba(255,255,255,0.25); }
+        .navbar-title { font-size: 1.3em; font-weight: 600; }
+        .navbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9em; }
+        .navbar-user span { opacity: 0.9; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
+            padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85em; transition: all 0.2s;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+        /* ===== 主体布局 ===== */
+        .main-layout { display: flex; max-width: 1400px; margin: 0 auto; padding: 20px; gap: 20px; min-height: calc(100vh - 60px); }
+
+        /* ===== 左侧词表面板 ===== */
+        .panel-left { width: 300px; flex-shrink: 0; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
+        .panel-header { padding: 18px 20px; font-size: 1.1em; font-weight: 600; color: #333; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .btn-add-list { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85em; transition: all 0.3s; }
+        .btn-add-list:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(102,126,234,0.3); }
+        .list-container { flex: 1; overflow-y: auto; padding: 10px; }
+        .list-item { padding: 14px 16px; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .list-item:hover { background: #f5f5fa; }
+        .list-item.active { background: linear-gradient(135deg, #667eea15, #764ba215); border: 1px solid #667eea40; }
+        .list-item-info { flex: 1; }
+        .list-item-name { font-weight: 600; color: #333; font-size: 0.95em; }
+        .list-item-desc { font-size: 0.8em; color: #999; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+        .list-item-count { background: #f0f0f5; color: #666; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; flex-shrink: 0; }
+        .list-item-actions { display: none; gap: 5px; flex-shrink: 0; }
+        .list-item.active .list-item-actions { display: flex; }
+        .list-item-actions button { background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; font-size: 0.9em; transition: background 0.2s; }
+        .list-item-actions button:hover { background: rgba(0,0,0,0.08); }
+
+        /* ===== 右侧单词面板 ===== */
+        .panel-right { flex: 1; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
+        .words-header { padding: 18px 24px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .words-header-title { font-size: 1.1em; font-weight: 600; color: #333; }
+        .words-header-count { font-size: 0.85em; color: #999; margin-left: 10px; }
+        .btn-add-word { background: #667eea; color: white; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s; }
+        .btn-add-word:hover { background: #5568d3; }
+
+        /* ===== 单词表格 ===== */
+        .words-table-wrap { flex: 1; overflow-y: auto; padding: 0; }
+        .words-table { width: 100%; border-collapse: collapse; }
+        .words-table th { background: #fafafa; padding: 12px 16px; text-align: left; font-size: 0.85em; color: #888; font-weight: 500; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 1; }
+        .words-table td { padding: 14px 16px; border-bottom: 1px solid #f5f5f5; font-size: 0.9em; color: #444; vertical-align: middle; }
+        .words-table tr:hover td { background: #fafbff; }
+        .word-cell { font-weight: 600; color: #667eea; font-size: 1em; }
+        .phonetic-cell { color: #888; font-size: 0.9em; }
+        .meaning-cell { max-width: 250px; }
+        .example-cell { max-width: 300px; color: #666; font-style: italic; font-size: 0.85em; }
+        .action-cell { display: flex; gap: 8px; }
+        .btn-edit, .btn-delete { border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8em; transition: all 0.2s; }
+        .btn-edit { background: #e8eaff; color: #667eea; }
+        .btn-edit:hover { background: #d0d4ff; }
+        .btn-delete { background: #ffeaea; color: #e74c3c; }
+        .btn-delete:hover { background: #ffd4d4; }
+
+        /* ===== 空状态 ===== */
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #bbb; }
+        .empty-icon { font-size: 3em; margin-bottom: 15px; }
+        .empty-text { font-size: 1em; }
+
+        /* ===== 弹窗 ===== */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(3px); }
+        .modal { background: white; border-radius: 16px; padding: 30px; width: 500px; max-width: 90vw; max-height: 91vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal-title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.85em; color: #666; margin-bottom: 6px; font-weight: 500; }
+        .form-input, .form-textarea, .form-select { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95em; transition: border-color 0.2s; outline: none; font-family: inherit; }
+        .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-textarea { resize: vertical; min-height: 70px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+        .btn-cancel { background: #f0f0f5; color: #666; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+        .btn-cancel:hover { background: #e0e0e8; }
+        .btn-confirm { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s; }
+        .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+        .btn-danger { background: #e74c3c; color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+        .btn-danger:hover { background: #c0392b; }
+
+        /* ===== Toast ===== */
+        .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.9); color: white; padding: 12px 28px; border-radius: 12px; font-size: 0.95em; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity 0.4s; backdrop-filter: blur(8px); }
+        .toast.show { opacity: 1; }
+        .toast.error { background: rgba(231,76,60,0.9); }
+        .toast.success { background: rgba(46,204,113,0.9); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ccc; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="toast" :class="{ show: toastVisible, error: toastType === 'error', success: toastType === 'success' }">{{ toastMessage }}</div>
+
+        <!-- 顶部导航 -->
+        <div class="navbar">
+            <div class="navbar-left">
+                <a class="navbar-back" href="/management">← 返回</a>
+                <div class="navbar-title">📚 单词管理</div>
+            </div>
+            <div class="navbar-user">
+                <span>👤 {{ adminUser.nickname || adminUser.username }}</span>
+                <button class="btn-logout" @click="handleLogout">退出</button>
+            </div>
+        </div>
+
+        <!-- 主体 -->
+        <div class="main-layout">
+            <div class="panel-left">
+                <div class="panel-header">
+                    <span>📚 单词表</span>
+                    <button class="btn-add-list" @click="openCreateList">+ 新建</button>
+                </div>
+                <div class="list-container">
+                    <div v-if="lists.length === 0" class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无词表</div></div>
+                    <div v-for="list in lists" :key="list.id" class="list-item" :class="{ active: selectedList && selectedList.id === list.id }" @click="selectList(list)">
+                        <div class="list-item-info">
+                            <div class="list-item-name">{{ list.name }}</div>
+                            <div class="list-item-desc" v-if="list.description">{{ list.description }}</div>
+                        </div>
+                        <span class="list-item-count">{{ list.word_count }} 词</span>
+                        <div class="list-item-actions">
+                            <button @click.stop="openEditList(list)" title="编辑词表">✏️</button>
+                            <button @click.stop="confirmDeleteList(list)" title="删除词表">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-right">
+                <template v-if="selectedList">
+                    <div class="words-header">
+                        <div><span class="words-header-title">{{ selectedList.name }}</span><span class="words-header-count">共 {{ words.length }} 个单词</span></div>
+                        <button class="btn-add-word" @click="openCreateWord">+ 添加单词</button>
+                    </div>
+                    <div class="words-table-wrap">
+                        <div v-if="words.length === 0" class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">该词表暂无单词</div></div>
+                        <table v-else class="words-table">
+                            <thead><tr><th style="width:50px">#</th><th style="width:140px">单词</th><th style="width:140px">音标</th><th>释义</th><th>例句</th><th>例句翻译</th><th style="width:120px">操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(w, index) in words" :key="w.id">
+                                    <td>{{ index + 1 }}</td><td class="word-cell">{{ w.word }}</td><td class="phonetic-cell">{{ w.phonetic || '-' }}</td>
+                                    <td class="meaning-cell">{{ w.meaning }}</td><td class="example-cell">{{ w.example || '-' }}</td><td class="example-cell">{{ w.example_translation || '-' }}</td>
+                                    <td><div class="action-cell"><button class="btn-edit" @click="openEditWord(w)">编辑</button><button class="btn-delete" @click="confirmDeleteWord(w)">删除</button></div></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+                <template v-else><div class="empty-state" style="height:100%"><div class="empty-icon">👈</div><div class="empty-text">请先选择或新建一个词表</div></div></template>
+            </div>
+        </div>
+
+        <!-- 弹窗：新建/编辑词表 -->
+        <div v-if="listModalVisible" class="modal-overlay" @click.self="listModalVisible = false">
+            <div class="modal">
+                <div class="modal-title">{{ listModalMode === 'create' ? '新建词表' : '编辑词表' }}</div>
+                <div class="form-group"><label class="form-label">词表名称 *</label><input class="form-input" v-model="listForm.name" placeholder="例如：CET-4 核心词汇" /></div>
+                <div class="form-group"><label class="form-label">词表描述</label><input class="form-input" v-model="listForm.description" placeholder="简要描述该词表的内容" /></div>
+                <div class="modal-actions"><button class="btn-cancel" @click="listModalVisible = false">取消</button><button class="btn-confirm" @click="submitListForm">确定</button></div>
+            </div>
+        </div>
+
+        <!-- 弹窗：删除词表确认 -->
+        <div v-if="deleteListModalVisible" class="modal-overlay" @click.self="deleteListModalVisible = false">
+            <div class="modal" style="width:400px">
+                <div class="modal-title">确认删除词表</div>
+                <p style="color:#666;margin-bottom:10px">确定要删除词表 <strong style="color:#e74c3c">「{{ deleteListTarget.name }}」</strong> 吗？</p>
+                <p style="color:#e74c3c;font-size:0.9em">⚠️ 该词表下的所有单词（{{ deleteListTarget.word_count }} 个）也将被一并删除，此操作不可撤销！</p>
+                <div class="modal-actions"><button class="btn-cancel" @click="deleteListModalVisible = false">取消</button><button class="btn-danger" @click="doDeleteList">确认删除</button></div>
+            </div>
+        </div>
+
+        <!-- 弹窗：新建/编辑单词 -->
+        <div v-if="wordModalVisible" class="modal-overlay" @click.self="wordModalVisible = false">
+            <div class="modal">
+                <div class="modal-title">{{ wordModalMode === 'create' ? '添加单词' : '编辑单词' }}</div>
+                <div class="form-group"><label class="form-label">单词 *</label><input class="form-input" v-model="wordForm.word" placeholder="例如：abandon" /></div>
+                <div class="form-group"><label class="form-label">音标</label><input class="form-input" v-model="wordForm.phonetic" placeholder="例如：/əˈbændən/" /></div>
+                <div class="form-group"><label class="form-label">释义 *</label><textarea class="form-textarea" v-model="wordForm.meaning" placeholder="例如：v. 放弃；抛弃"></textarea></div>
+                <div class="form-group"><label class="form-label">例句</label><textarea class="form-textarea" v-model="wordForm.example" placeholder="例如：He abandoned his plan."></textarea></div>
+                <div class="form-group"><label class="form-label">例句翻译</label><textarea class="form-textarea" v-model="wordForm.example_translation" placeholder="例如：他放弃了计划。"></textarea></div>
+                <div class="modal-actions"><button class="btn-cancel" @click="wordModalVisible = false">取消</button><button class="btn-confirm" @click="submitWordForm">确定</button></div>
+            </div>
+        </div>
+
+        <!-- 弹窗：删除单词确认 -->
+        <div v-if="deleteWordModalVisible" class="modal-overlay" @click.self="deleteWordModalVisible = false">
+            <div class="modal" style="width:400px">
+                <div class="modal-title">确认删除单词</div>
+                <p style="color:#666">确定要删除单词 <strong style="color:#e74c3c">「{{ deleteWordTarget.word }}」</strong> 吗？</p>
+                <div class="modal-actions"><button class="btn-cancel" @click="deleteWordModalVisible = false">取消</button><button class="btn-danger" @click="doDeleteWord">确认删除</button></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/management';
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    adminUser: {},
+                    lists: [], selectedList: null, words: [],
+                    listModalVisible: false, listModalMode: 'create', listForm: { id: null, name: '', description: '' },
+                    deleteListModalVisible: false, deleteListTarget: {},
+                    wordModalVisible: false, wordModalMode: 'create', wordForm: { id: null, word: '', phonetic: '', meaning: '', example: '', example_translation: '' },
+                    deleteWordModalVisible: false, deleteWordTarget: {},
+                    toastVisible: false, toastMessage: '', toastType: 'success', toastTimer: null
+                };
+            },
+            methods: {
+                handleLogout() { localStorage.removeItem('admin_user'); window.location.href = '/login'; },
+                async fetchLists() {
+                    try { const res = await axios.get(`${API_BASE}/lists`); this.lists = res.data;
+                        if (this.selectedList) { const u = this.lists.find(l => l.id === this.selectedList.id); if (u) this.selectedList = u; else { this.selectedList = null; this.words = []; } }
+                    } catch { this.showToast('获取词表失败', 'error'); }
+                },
+                async fetchWords() {
+                    if (!this.selectedList) return;
+                    try { const res = await axios.get(`${API_BASE}/lists/${this.selectedList.id}/words`); this.words = res.data; } catch { this.showToast('获取单词失败', 'error'); }
+                },
+                selectList(list) { this.selectedList = list; this.fetchWords(); },
+                openCreateList() { this.listModalMode = 'create'; this.listForm = { id: null, name: '', description: '' }; this.listModalVisible = true; },
+                openEditList(list) { this.listModalMode = 'edit'; this.listForm = { id: list.id, name: list.name, description: list.description || '' }; this.listModalVisible = true; },
+                async submitListForm() {
+                    if (!this.listForm.name.trim()) { this.showToast('请输入词表名称', 'error'); return; }
+                    try {
+                        if (this.listModalMode === 'create') await axios.post(`${API_BASE}/lists`, { name: this.listForm.name.trim(), description: this.listForm.description.trim() });
+                        else await axios.put(`${API_BASE}/lists/${this.listForm.id}`, { name: this.listForm.name.trim(), description: this.listForm.description.trim() });
+                        this.showToast(this.listModalMode === 'create' ? '词表创建成功' : '词表更新成功', 'success');
+                        this.listModalVisible = false; await this.fetchLists();
+                    } catch (err) { this.showToast(err.response?.data?.detail || '操作失败', 'error'); }
+                },
+                confirmDeleteList(list) { this.deleteListTarget = { ...list }; this.deleteListModalVisible = true; },
+                async doDeleteList() {
+                    try { await axios.delete(`${API_BASE}/lists/${this.deleteListTarget.id}`); this.showToast('词表已删除', 'success'); this.deleteListModalVisible = false;
+                        if (this.selectedList?.id === this.deleteListTarget.id) { this.selectedList = null; this.words = []; } await this.fetchLists();
+                    } catch { this.showToast('删除失败', 'error'); }
+                },
+                openCreateWord() { this.wordModalMode = 'create'; this.wordForm = { id: null, word: '', phonetic: '', meaning: '', example: '', example_translation: '' }; this.wordModalVisible = true; },
+                openEditWord(w) { this.wordModalMode = 'edit'; this.wordForm = { id: w.id, word: w.word, phonetic: w.phonetic||'', meaning: w.meaning, example: w.example||'', example_translation: w.example_translation||'' }; this.wordModalVisible = true; },
+                async submitWordForm() {
+                    if (!this.wordForm.word.trim()) { this.showToast('请输入单词', 'error'); return; }
+                    if (!this.wordForm.meaning.trim()) { this.showToast('请输入释义', 'error'); return; }
+                    try {
+                        if (this.wordModalMode === 'create') await axios.post(`${API_BASE}/words`, { list_id: this.selectedList.id, ...this.wordForm });
+                        else await axios.put(`${API_BASE}/words/${this.wordForm.id}`, { word: this.wordForm.word.trim(), phonetic: this.wordForm.phonetic.trim(), meaning: this.wordForm.meaning.trim(), example: this.wordForm.example.trim(), example_translation: this.wordForm.example_translation.trim() });
+                        this.showToast(this.wordModalMode === 'create' ? '单词添加成功' : '单词更新成功', 'success');
+                        this.wordModalVisible = false; await this.fetchWords(); await this.fetchLists();
+                    } catch (err) { this.showToast(err.response?.data?.detail || '操作失败', 'error'); }
+                },
+                confirmDeleteWord(w) { this.deleteWordTarget = { ...w }; this.deleteWordModalVisible = true; },
+                async doDeleteWord() {
+                    try { await axios.delete(`${API_BASE}/words/${this.deleteWordTarget.id}`); this.showToast('单词已删除', 'success'); this.deleteWordModalVisible = false; await this.fetchWords(); await this.fetchLists();
+                    } catch { this.showToast('删除失败', 'error'); }
+                },
+                showToast(message, type = 'success') {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastMessage = message; this.toastType = type; this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 2000);
+                }
+            },
+            async mounted() {
+                // 登录检查
+                const saved = localStorage.getItem('admin_user');
+                if (!saved) { window.location.href = '/login'; return; }
+                this.adminUser = JSON.parse(saved);
+                await this.fetchLists();
+                if (this.lists.length > 0) this.selectList(this.lists[0]);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

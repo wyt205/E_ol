@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 管理后台</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ===== 登录卡片 ===== */
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            width: 420px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .login-icon {
+            font-size: 3.5em;
+            margin-bottom: 10px;
+        }
+
+        .login-title {
+            font-size: 1.6em;
+            color: #333;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .login-subtitle {
+            font-size: 0.9em;
+            color: #999;
+            margin-bottom: 35px;
+        }
+
+        /* ===== 表单 ===== */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 13px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 1em;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-input.error {
+            border-color: #e74c3c;
+        }
+
+        /* ===== 登录按钮 ===== */
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn-login:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* ===== 错误提示 ===== */
+        .error-msg {
+            color: #e74c3c;
+            font-size: 0.85em;
+            margin-top: 12px;
+            min-height: 20px;
+        }
+
+        /* ===== 底部链接 ===== */
+        .login-footer {
+            margin-top: 30px;
+            font-size: 0.85em;
+            color: #bbb;
+        }
+
+        .login-footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="login-card">
+            <div class="login-icon">🔐</div>
+            <div class="login-title">管理后台登录</div>
+            <div class="login-subtitle">英语单词学习系统 · 管理员入口</div>
+
+            <div class="form-group">
+                <label class="form-label">邮箱</label>
+                <input class="form-input" :class="{ error: loginError }"
+                    v-model="email" placeholder="请输入邮箱"
+                    @keydown.enter="$refs.pwdInput.focus()" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input class="form-input" :class="{ error: loginError }"
+                    ref="pwdInput" type="password"
+                    v-model="password" placeholder="请输入密码"
+                    @keydown.enter="handleLogin" />
+            </div>
+
+            <div class="error-msg">{{ errorMsg }}</div>
+
+            <button class="btn-login" @click="handleLogin" :disabled="loading">
+                {{ loading ? '登录中...' : '登 录' }}
+            </button>
+
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    email: '',        // 邮箱输入（替代原用户名）
+                    password: '',     // 密码输入
+                    loading: false,   // 登录中状态
+                    loginError: false, // 输入框标红
+                    errorMsg: ''      // 错误提示文本
+                };
+            },
+            methods: {
+                async handleLogin() {
+                    // 1. 校验输入不为空
+                    if (!this.email.trim()) {
+                        this.errorMsg = '请输入邮箱';
+                        this.loginError = true;
+                        return;
+                    }
+                    if (!this.password) {
+                        this.errorMsg = '请输入密码';
+                        this.loginError = true;
+                        return;
+                    }
+
+                    // 2. 清除之前的错误状态
+                    this.loginError = false;
+                    this.errorMsg = '';
+                    this.loading = true;
+
+                    try {
+                        // 3. 调用登录接口（使用邮箱 + 密码）
+                        const res = await axios.post('http://localhost:3000/api/auth/login', {
+                            email: this.email.trim(),
+                            password: this.password
+                        });
+
+                        // 4. 检查是否为管理员
+                        if (res.data.user.role !== 'admin') {
+                            this.errorMsg = '该账号不是管理员，无权登录后台';
+                            this.loginError = true;
+                            return;
+                        }
+
+                        // 5. 保存登录状态到 localStorage
+                        localStorage.setItem('admin_user', JSON.stringify(res.data.user));
+
+                        // 6. 跳转到管理选择页
+                        window.location.href = '/management';
+                    } catch (err) {
+                        // 7. 显示后端返回的错误信息
+                        this.errorMsg = err.response?.data?.detail || '登录失败，请检查网络';
+                        this.loginError = true;
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            },
+            mounted() {
+                // 如果已登录，直接跳转
+                const saved = localStorage.getItem('admin_user');
+                if (saved) {
+                    window.location.href = '/management';
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

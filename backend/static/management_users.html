@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 管理后台</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+        /* ===== 顶部导航栏 ===== */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 0 30px; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;
+        }
+        .navbar-left { display: flex; align-items: center; gap: 20px; }
+        .navbar-back {
+            color: white; text-decoration: none; font-size: 0.9em;
+            background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 8px; transition: background 0.2s;
+        }
+        .navbar-back:hover { background: rgba(255,255,255,0.25); }
+        .navbar-title { font-size: 1.3em; font-weight: 600; }
+        .navbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9em; }
+        .navbar-user span { opacity: 0.9; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
+            padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85em; transition: all 0.2s;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+        /* ===== 主体内容 ===== */
+        .main-content { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+
+        .content-card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px; border-bottom: 1px solid #eee;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .card-header-title { font-size: 1.1em; font-weight: 600; color: #333; }
+        .card-header-count { font-size: 0.85em; color: #999; margin-left: 10px; }
+
+        .btn-add-user {
+            background: linear-gradient(135deg, #667eea, #764ba2); color: white;
+            border: none; padding: 8px 20px; border-radius: 8px;
+            cursor: pointer; font-size: 0.9em; transition: all 0.3s;
+        }
+        .btn-add-user:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+
+        /* ===== 用户表格 ===== */
+        .users-table { width: 100%; border-collapse: collapse; }
+        .users-table th {
+            background: #fafafa; padding: 14px 20px; text-align: left;
+            font-size: 0.85em; color: #888; font-weight: 500; border-bottom: 1px solid #eee;
+        }
+        .users-table td {
+            padding: 16px 20px; border-bottom: 1px solid #f5f5f5;
+            font-size: 0.9em; color: #444; vertical-align: middle;
+        }
+        .users-table tr:hover td { background: #fafbff; }
+
+        .username-cell { font-weight: 600; color: #333; }
+        .nickname-cell { color: #555; }
+
+        /* 角色标签 */
+        .role-tag {
+            display: inline-block; padding: 3px 10px; border-radius: 12px;
+            font-size: 0.8em; font-weight: 500;
+        }
+        .role-tag.admin { background: #fff3e0; color: #e65100; }
+        .role-tag.user { background: #e8eaff; color: #667eea; }
+
+        /* 状态标签 */
+        .status-tag {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 12px; font-size: 0.8em;
+        }
+        .status-tag.active { background: #e8f5e9; color: #2e7d32; }
+        .status-tag.disabled { background: #fce4ec; color: #c62828; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .status-tag.active .status-dot { background: #4caf50; }
+        .status-tag.disabled .status-dot { background: #ef5350; }
+
+        .action-cell { display: flex; gap: 8px; }
+        .btn-edit, .btn-delete, .btn-toggle {
+            border: none; padding: 5px 12px; border-radius: 6px;
+            cursor: pointer; font-size: 0.8em; transition: all 0.2s;
+        }
+        .btn-edit { background: #e8eaff; color: #667eea; }
+        .btn-edit:hover { background: #d0d4ff; }
+        .btn-delete { background: #ffeaea; color: #e74c3c; }
+        .btn-delete:hover { background: #ffd4d4; }
+        .btn-toggle { background: #fff3e0; color: #e65100; }
+        .btn-toggle:hover { background: #ffe0b2; }
+
+        .time-cell { font-size: 0.8em; color: #999; }
+
+        /* ===== 弹窗 ===== */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
+            z-index: 1000; backdrop-filter: blur(3px);
+        }
+        .modal {
+            background: white; border-radius: 16px; padding: 30px;
+            width: 480px; max-width: 90vw; max-height: 91vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal-title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.85em; color: #666; margin-bottom: 6px; font-weight: 500; }
+        .form-input, .form-select {
+            width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 0.95em; transition: border-color 0.2s; outline: none; font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+        .btn-cancel { background: #f0f0f5; color: #666; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+        .btn-cancel:hover { background: #e0e0e8; }
+        .btn-confirm { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: all 0.3s; }
+        .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+        .btn-danger { background: #e74c3c; color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+        .btn-danger:hover { background: #c0392b; }
+
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #bbb; }
+        .empty-icon { font-size: 3em; margin-bottom: 15px; }
+
+        .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.9); color: white; padding: 12px 28px; border-radius: 12px; font-size: 0.95em; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity 0.4s; backdrop-filter: blur(8px); }
+        .toast.show { opacity: 1; }
+        .toast.error { background: rgba(231,76,60,0.9); }
+        .toast.success { background: rgba(46,204,113,0.9); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="toast" :class="{ show: toastVisible, error: toastType === 'error', success: toastType === 'success' }">{{ toastMessage }}</div>
+
+        <!-- 顶部导航 -->
+        <div class="navbar">
+            <div class="navbar-left">
+                <a class="navbar-back" href="/management">← 返回</a>
+                <div class="navbar-title">👥 用户管理</div>
+            </div>
+            <div class="navbar-user">
+                <span>👤 {{ adminUser.nickname || adminUser.username }}</span>
+                <button class="btn-logout" @click="handleLogout">退出</button>
+            </div>
+        </div>
+
+        <!-- 主体 -->
+        <div class="main-content">
+            <div class="content-card">
+                <div class="card-header">
+                    <div>
+                        <span class="card-header-title">用户列表</span>
+                        <span class="card-header-count">共 {{ users.length }} 个用户</span>
+                    </div>
+                    <button class="btn-add-user" @click="openCreateUser">+ 新建用户</button>
+                </div>
+
+                <div v-if="users.length === 0" class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <div>暂无用户数据</div>
+                </div>
+
+                <table v-else class="users-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">#</th>
+                            <th style="width:120px">用户名</th>
+                            <th style="width:100px">昵称</th>
+                            <th style="width:90px">角色</th>
+                            <th style="width:90px">状态</th>
+                            <th>创建时间</th>
+                            <th style="width:180px">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(u, index) in users" :key="u.id">
+                            <td>{{ index + 1 }}</td>
+                            <td class="username-cell">{{ u.username }}</td>
+                            <td class="nickname-cell">{{ u.nickname || '-' }}</td>
+                            <td>
+                                <span class="role-tag" :class="u.role">
+                                    {{ u.role === 'admin' ? '管理员' : '用户' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-tag" :class="u.status">
+                                    <span class="status-dot"></span>
+                                    {{ u.status === 'active' ? '启用' : '禁用' }}
+                                </span>
+                            </td>
+                            <td class="time-cell">{{ u.created_at }}</td>
+                            <td>
+                                <div class="action-cell">
+                                    <button class="btn-edit" @click="openEditUser(u)">编辑</button>
+                                    <button class="btn-toggle" @click="toggleUserStatus(u)">
+                                        {{ u.status === 'active' ? '禁用' : '启用' }}
+                                    </button>
+                                    <button class="btn-delete" @click="confirmDeleteUser(u)"
+                                        :disabled="u.role === 'admin' && adminCount <= 1">删除</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 弹窗：新建/编辑用户 -->
+        <div v-if="userModalVisible" class="modal-overlay" @click.self="userModalVisible = false">
+            <div class="modal">
+                <div class="modal-title">{{ userModalMode === 'create' ? '新建用户' : '编辑用户' }}</div>
+
+                <div class="form-group">
+                    <label class="form-label">用户名 *</label>
+                    <input class="form-input" v-model="userForm.username" placeholder="登录用户名"
+                        :disabled="userModalMode === 'edit'" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">邮箱</label>
+                    <input class="form-input" type="email" v-model="userForm.email" placeholder="用户邮箱（可用于登录）" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">{{ userModalMode === 'create' ? '密码 *' : '新密码（留空不修改）' }}</label>
+                    <input class="form-input" type="password" v-model="userForm.password"
+                        :placeholder="userModalMode === 'create' ? '设置登录密码' : '留空则不修改密码'" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">昵称</label>
+                    <input class="form-input" v-model="userForm.nickname" placeholder="用户显示名称" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">角色</label>
+                    <select class="form-select" v-model="userForm.role">
+                        <option value="user">普通用户</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+
+                <div class="form-group" v-if="userModalMode === 'edit'">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" v-model="userForm.status">
+                        <option value="active">启用</option>
+                        <option value="disabled">禁用</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-cancel" @click="userModalVisible = false">取消</button>
+                    <button class="btn-confirm" @click="submitUserForm">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 弹窗：删除确认 -->
+        <div v-if="deleteModalVisible" class="modal-overlay" @click.self="deleteModalVisible = false">
+            <div class="modal" style="width:400px">
+                <div class="modal-title">确认删除用户</div>
+                <p style="color:#666">
+                    确定要删除用户 <strong style="color:#e74c3c">「{{ deleteTarget.username }}」</strong> 吗？
+                </p>
+                <div class="modal-actions">
+                    <button class="btn-cancel" @click="deleteModalVisible = false">取消</button>
+                    <button class="btn-danger" @click="doDeleteUser">确认删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/management/users';
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    adminUser: {},
+                    users: [],
+                    // 用户弹窗
+                    userModalVisible: false,
+                    userModalMode: 'create',
+                    userForm: { id: null, username: '', password: '', nickname: '', email: '', role: 'user', status: 'active' },
+                    // 删除弹窗
+                    deleteModalVisible: false,
+                    deleteTarget: {},
+                    // Toast
+                    toastVisible: false, toastMessage: '', toastType: 'success', toastTimer: null
+                };
+            },
+            computed: {
+                // 当前管理员数量（用于判断能否删除）
+                adminCount() {
+                    return this.users.filter(u => u.role === 'admin').length;
+                }
+            },
+            methods: {
+                handleLogout() { localStorage.removeItem('admin_user'); window.location.href = '/login'; },
+
+                // ===== 加载用户列表 =====
+                async fetchUsers() {
+                    try {
+                        const res = await axios.get(API_BASE);
+                        this.users = res.data;
+                    } catch {
+                        this.showToast('获取用户列表失败', 'error');
+                    }
+                },
+
+                // ===== 新建用户 =====
+                openCreateUser() {
+                    this.userModalMode = 'create';
+                    this.userForm = { id: null, username: '', password: '', nickname: '', email: '', role: 'user', status: 'active' };
+                    this.userModalVisible = true;
+                },
+
+                // ===== 编辑用户 =====
+                openEditUser(u) {
+                    this.userModalMode = 'edit';
+                    this.userForm = {
+                        id: u.id, username: u.username, password: '',
+                        nickname: u.nickname || '', email: u.email || '', role: u.role, status: u.status
+                    };
+                    this.userModalVisible = true;
+                },
+
+                // ===== 提交用户表单 =====
+                async submitUserForm() {
+                    if (this.userModalMode === 'create') {
+                        // 新建：校验必填字段
+                        if (!this.userForm.username.trim()) { this.showToast('请输入用户名', 'error'); return; }
+                        if (!this.userForm.password) { this.showToast('请设置密码', 'error'); return; }
+                        try {
+                            await axios.post(API_BASE, {
+                                username: this.userForm.username.trim(),
+                                password: this.userForm.password,
+                                nickname: this.userForm.nickname.trim(),
+                                email: this.userForm.email.trim(),
+                                role: this.userForm.role
+                            });
+                            this.showToast('用户创建成功', 'success');
+                            this.userModalVisible = false;
+                            await this.fetchUsers();
+                        } catch (err) {
+                            this.showToast(err.response?.data?.detail || '创建失败', 'error');
+                        }
+                    } else {
+                        // 编辑：更新用户信息
+                        try {
+                            const data = { nickname: this.userForm.nickname.trim(), email: this.userForm.email.trim(), role: this.userForm.role, status: this.userForm.status };
+                            // 密码留空则不修改
+                            if (this.userForm.password) data.password = this.userForm.password;
+                            await axios.put(`${API_BASE}/${this.userForm.id}`, data);
+                            this.showToast('用户信息已更新', 'success');
+                            this.userModalVisible = false;
+                            await this.fetchUsers();
+                        } catch (err) {
+                            this.showToast(err.response?.data?.detail || '更新失败', 'error');
+                        }
+                    }
+                },
+
+                // ===== 快速切换启用/禁用 =====
+                async toggleUserStatus(u) {
+                    const newStatus = u.status === 'active' ? 'disabled' : 'active';
+                    try {
+                        await axios.put(`${API_BASE}/${u.id}`, { status: newStatus });
+                        this.showToast(`用户 ${u.username} 已${newStatus === 'active' ? '启用' : '禁用'}`, 'success');
+                        await this.fetchUsers();
+                    } catch (err) {
+                        this.showToast(err.response?.data?.detail || '操作失败', 'error');
+                    }
+                },
+
+                // ===== 删除用户 =====
+                confirmDeleteUser(u) {
+                    this.deleteTarget = { ...u };
+                    this.deleteModalVisible = true;
+                },
+                async doDeleteUser() {
+                    try {
+                        await axios.delete(`${API_BASE}/${this.deleteTarget.id}`);
+                        this.showToast('用户已删除', 'success');
+                        this.deleteModalVisible = false;
+                        await this.fetchUsers();
+                    } catch (err) {
+                        this.showToast(err.response?.data?.detail || '删除失败', 'error');
+                    }
+                },
+
+                // ===== Toast =====
+                showToast(message, type = 'success') {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastMessage = message; this.toastType = type; this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 2000);
+                }
+            },
+            async mounted() {
+                // 登录检查
+                const saved = localStorage.getItem('admin_user');
+                if (!saved) { window.location.href = '/login'; return; }
+                this.adminUser = JSON.parse(saved);
+                await this.fetchUsers();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

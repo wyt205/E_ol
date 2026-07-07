@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 英语单词学习系统</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+        }
+
+        /* ===== 顶部导航栏 ===== */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0 30px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-title {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9em;
+        }
+
+        .navbar-user span { opacity: 0.9; }
+
+        .btn-logout {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 6px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* ===== 选择中心 ===== */
+        .hub-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .hub-title {
+            font-size: 2em;
+            color: #333;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .hub-subtitle {
+            font-size: 1em;
+            color: #999;
+            margin-bottom: 50px;
+        }
+
+        .hub-cards {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hub-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 30px;
+            width: 300px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .hub-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+        }
+
+        .hub-card-icon {
+            font-size: 3em;
+            margin-bottom: 18px;
+        }
+
+        .hub-card-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .hub-card-desc {
+            font-size: 0.9em;
+            color: #999;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部导航 -->
+        <div class="navbar">
+            <div class="navbar-title">📋 管理后台</div>
+            <div class="navbar-user">
+                <span>👤 {{ adminUser.nickname || adminUser.username }}</span>
+                <button class="btn-logout" @click="handleLogout">退出登录</button>
+            </div>
+        </div>
+
+        <!-- 选择中心 -->
+        <div class="hub-container">
+            <div class="hub-title">请选择管理模块</div>
+            <div class="hub-subtitle">选择要进入的管理功能</div>
+
+            <div class="hub-cards">
+                <a class="hub-card" href="/management/words">
+                    <div class="hub-card-icon">📚</div>
+                    <div class="hub-card-title">单词管理</div>
+                    <div class="hub-card-desc">管理词表和单词内容<br>增删改查、批量导入</div>
+                </a>
+                <a class="hub-card" href="/management/users">
+                    <div class="hub-card-icon">👥</div>
+                    <div class="hub-card-title">用户管理</div>
+                    <div class="hub-card-desc">管理系统用户账号<br>创建、编辑、启用/禁用</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    adminUser: {}  // 当前登录的管理员信息
+                };
+            },
+            methods: {
+                handleLogout() {
+                    // 清除登录状态并跳转到登录页
+                    localStorage.removeItem('admin_user');
+                    window.location.href = '/login';
+                }
+            },
+            mounted() {
+                // 检查登录状态
+                const saved = localStorage.getItem('admin_user');
+                if (!saved) {
+                    // 未登录，跳转到登录页
+                    window.location.href = '/login';
+                    return;
+                }
+                this.adminUser = JSON.parse(saved);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

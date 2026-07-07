@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语单词学习系统</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* ===== 整体布局：全屏容器 ===== */
+        .app-layout {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ===== 左侧边栏 ===== */
+        .sidebar-left {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 180px;
+            background: white;
+            border-radius: 0 16px 16px 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 2px 0 15px rgba(0,0,0,0.08);
+        }
+
+        .sidebar-left.hidden {
+            transform: translateY(-50%) translateX(-100%);
+        }
+
+        /* ===== 右侧边栏 ===== */
+        .sidebar-right {
+            position: fixed;
+            right: 0; top: 0; bottom: 0;
+            width: 70px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: -2px 0 15px rgba(0,0,0,0.08);
+        }
+
+        .sidebar-right.hidden {
+            transform: translateX(100%);
+        }
+
+        /* ===== 边界触发区域（隐藏时显示） ===== */
+        .edge-trigger {
+            position: fixed;
+            top: 0;
+            width: 20px;
+            height: 100%;
+            z-index: 99;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .edge-trigger.left { left: 0; }
+        .edge-trigger.right { right: 0; }
+
+        .edge-trigger:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 触发区域内的小指示条 */
+        .edge-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 50px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.5);
+            transition: all 0.3s;
+        }
+
+        .edge-trigger.left .edge-indicator { left: 4px; }
+        .edge-trigger.right .edge-indicator { right: 4px; }
+
+        .edge-trigger:hover .edge-indicator {
+            height: 80px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        /* ===== 中间主内容区（独立居中卡片） ===== */
+        .main-content {
+            width: 75vw;
+            max-width: 1200px;
+            aspect-ratio: 16 / 9;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            flex-shrink: 0;
+        }
+
+        .word-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            min-height: 0;
+            position: relative;
+        }
+
+        .word-title {
+            font-size: clamp(2em, 4vw, 3.5em);
+            color: #667eea;
+            margin-bottom: 12px;
+            text-align: center;
+            font-weight: bold;
+            word-wrap: break-word;
+            word-break: break-word;
+            max-width: 100%;
+            line-height: 1.3;
+        }
+
+        .phonetic {
+            font-size: clamp(1.2em, 2.5vw, 1.8em);
+            color: #666;
+            text-align: center;
+            margin-bottom: 18px;
+            flex-shrink: 0;
+        }
+
+        .meaning {
+            font-size: clamp(1.3em, 2.8vw, 2em);
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            max-width: 100%;
+            flex-shrink: 0;
+        }
+
+        .example {
+            font-size: clamp(1em, 2vw, 1.3em);
+            color: #555;
+            text-align: left;
+            font-style: italic;
+            padding: 18px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 10px;
+            line-height: 1.8;
+            word-wrap: break-word;
+            max-width: 100%;
+            flex-shrink: 1;
+            position: relative;
+        }
+
+        /* ===== 例句翻译区域 ===== */
+        .example-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .example-text {
+            flex: 1;
+        }
+
+        .example-translate-btn {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2px;
+        }
+
+        .example-translate-btn:hover {
+            background: rgba(102, 126, 234, 0.25);
+            transform: scale(1.1);
+        }
+
+        .example-translate-btn.active {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .example-translation {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.35s ease, margin-top 0.35s ease;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .example-translation.show {
+            max-height: 200px;
+            opacity: 1;
+            margin-top: 12px;
+        }
+
+        .example-translation-inner {
+            font-size: clamp(0.9em, 1.8vw, 1.15em);
+            color: #888;
+            font-style: normal;
+            line-height: 1.7;
+            padding: 10px 14px;
+            background: rgba(102, 126, 234, 0.06);
+            border-radius: 8px;
+            border-left: 3px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+            margin-top: auto;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn-prev { background: #667eea; color: white; }
+        .btn-prev:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-next { background: #764ba2; color: white; }
+        .btn-next:hover:not(:disabled) {
+            background: #633d8a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+        }
+
+        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+
+        .progress {
+            text-align: center;
+            color: #666;
+            font-size: 1.1em;
+            margin-top: 15px;
+            flex-shrink: 0;
+        }
+
+        .loading { text-align: center; color: #667eea; font-size: 1.5em; padding: 50px; }
+
+        .error {
+            text-align: center; color: #e74c3c; font-size: 1.2em;
+            padding: 20px; background: #ffeaea; border-radius: 10px;
+        }
+
+        /* ===== 左侧边栏内部元素 ===== */
+        .sidebar-title {
+            font-size: 0.85em;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 0 10px 10px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+
+        .mode-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .mode-item + .mode-item {
+            position: relative;
+        }
+
+        .mode-item + .mode-item::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: #d0d0d8;
+        }
+
+        .mode-item:hover { background: #f0f0f5; color: #333; }
+
+        .mode-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .mode-icon { font-size: 1.3em; width: 28px; text-align: center; flex-shrink: 0; }
+        .mode-label { font-weight: 500; }
+
+        .mode-item.pending { opacity: 0.5; }
+
+        /* ===== 右侧边栏内部元素 ===== */
+        .avatar-area {
+            width: 45px; height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4em; color: white;
+            margin-bottom: 15px; cursor: pointer;
+            transition: transform 0.2s; flex-shrink: 0;
+        }
+        .avatar-area:hover { transform: scale(1.1); }
+
+        .menu-item {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.25s ease;
+            color: #777; gap: 2px; position: relative;
+        }
+        .menu-item:hover { background: #f0f0f5; color: #667eea; }
+        .menu-item .menu-icon { font-size: 1.3em; }
+        .menu-item .menu-text { font-size: 0.55em; white-space: nowrap; }
+
+        .menu-item .tooltip {
+            position: absolute; right: 58px;
+            background: #333; color: white;
+            padding: 5px 10px; border-radius: 6px;
+            font-size: 0.75em; white-space: nowrap;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .menu-item:hover .tooltip { opacity: 1; }
+
+        .menu-divider { width: 35px; height: 1px; background: #eee; margin: 5px 0; flex-shrink: 0; }
+
+        .toggle-btn {
+            margin-top: auto; width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.25s ease;
+            color: #999; font-size: 1.3em; flex-shrink: 0;
+        }
+        .toggle-btn:hover { background: #f0f0f5; color: #667eea; }
+
+        /* ===== Toast 提示 ===== */
+        .toast {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(50, 50, 50, 0.9);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 12px;
+            font-size: 0.95em;
+            z-index: 10001;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .toast.show { opacity: 1; }
+
+        /* ===== 登录弹窗 ===== */
+        .login-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .login-modal {
+            background: white; border-radius: 20px; padding: 40px;
+            width: 380px; max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .login-modal-title {
+            font-size: 1.5em; font-weight: bold; text-align: center;
+            margin-bottom: 6px; color: #333;
+        }
+        .login-modal-sub {
+            text-align: center; color: #999; font-size: 0.85em; margin-bottom: 25px;
+        }
+        .login-modal .form-group { margin-bottom: 18px; }
+        .login-modal .form-label {
+            display: block; font-size: 0.85em; color: #555;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .login-modal .form-input {
+            width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0;
+            border-radius: 10px; font-size: 1em; outline: none;
+            transition: border-color 0.2s;
+        }
+        .login-modal .form-input:focus { border-color: #667eea; }
+        .login-error-msg {
+            color: #e74c3c; font-size: 0.85em; text-align: center;
+            margin-bottom: 12px;
+        }
+        .login-submit-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; font-size: 1.05em; font-weight: bold;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        .login-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .login-submit-btn:hover:not(:disabled) { opacity: 0.9; }
+        .login-footer {
+            text-align: center; margin-top: 15px;
+        }
+        .login-footer a {
+            color: #667eea; font-size: 0.8em; cursor: pointer;
+            text-decoration: none;
+        }
+        .login-footer a:hover { text-decoration: underline; }
+
+        /* ===== 注册弹窗 ===== */
+        .register-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .register-modal {
+            background: white; border-radius: 20px; padding: 40px;
+            width: 380px; max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2); position: relative;
+        }
+        .register-modal-title {
+            font-size: 1.5em; font-weight: bold; text-align: center;
+            margin-bottom: 6px; color: #333;
+        }
+        .register-modal-sub {
+            text-align: center; color: #999; font-size: 0.85em; margin-bottom: 25px;
+        }
+        .register-modal .form-group { margin-bottom: 18px; }
+        .register-modal .form-label {
+            display: block; font-size: 0.85em; color: #555;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .register-modal .form-input {
+            width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0;
+            border-radius: 10px; font-size: 1em; outline: none;
+            transition: border-color 0.2s;
+        }
+        .register-modal .form-input:focus { border-color: #667eea; }
+        .register-error-msg {
+            color: #e74c3c; font-size: 0.85em; text-align: center;
+            margin-bottom: 12px;
+        }
+        .register-success-msg {
+            color: #2ecc71; font-size: 0.85em; text-align: center;
+            margin-bottom: 12px;
+        }
+        .register-submit-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; font-size: 1.05em; font-weight: bold;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        .register-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .register-submit-btn:hover:not(:disabled) { opacity: 0.9; }
+        .register-footer {
+            text-align: center; margin-top: 15px;
+        }
+        .register-footer a {
+            color: #667eea; font-size: 0.8em; cursor: pointer;
+            text-decoration: none;
+        }
+        .register-footer a:hover { text-decoration: underline; }
+
+        /* ===== 个人信息表单弹窗 ===== */
+        .profile-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .profile-modal {
+            background: white; border-radius: 20px; padding: 36px 32px 28px;
+            width: 420px; max-width: 92vw; max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2); position: relative;
+        }
+        .profile-modal-close {
+            position: absolute; top: 14px; right: 18px;
+            background: none; border: none; font-size: 1.4em;
+            cursor: pointer; color: #aaa; transition: color 0.2s;
+        }
+        .profile-modal-close:hover { color: #333; }
+        .profile-modal-header {
+            display: flex; flex-direction: column; align-items: center;
+            margin-bottom: 24px;
+        }
+        .profile-modal-avatar {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8em; color: white; margin-bottom: 8px;
+        }
+        .profile-modal-email {
+            font-size: 0.82em; color: #888;
+            margin-bottom: 2px;
+        }
+        .profile-modal-role {
+            font-size: 0.75em; color: #bbb; margin-top: 2px;
+        }
+        .profile-form-group {
+            margin-bottom: 16px;
+        }
+        .profile-form-group label {
+            display: block; font-size: 0.82em; color: #666;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .profile-form-group input {
+            width: 100%; padding: 11px 14px; border: 2px solid #e8e8e8;
+            border-radius: 10px; font-size: 0.95em; outline: none;
+            transition: border-color 0.2s;
+        }
+        .profile-form-group input:focus { border-color: #667eea; }
+        .profile-form-group .field-hint {
+            font-size: 0.72em; color: #bbb; margin-top: 4px;
+        }
+        .profile-save-btn {
+            width: 100%; padding: 12px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; font-size: 0.95em; font-weight: bold;
+            cursor: pointer; transition: opacity 0.2s; margin-top: 6px;
+        }
+        .profile-save-btn:hover:not(:disabled) { opacity: 0.9; }
+        .profile-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .profile-save-msg {
+            text-align: center; font-size: 0.82em; margin-top: 8px; min-height: 18px;
+        }
+        .profile-save-msg.success { color: #2ecc71; }
+        .profile-save-msg.error { color: #e74c3c; }
+        .profile-divider {
+            height: 1px; background: #f0f0f0; margin: 20px 0;
+        }
+        .profile-logout-btn {
+            width: 100%; padding: 12px; border: none; border-radius: 12px;
+            background: #fff5f5; color: #e74c3c; font-size: 0.92em;
+            font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+        .profile-logout-btn:hover { background: #ffe8e8; }
+
+        /* ===== 拼写模式 ===== */
+        .spell-btn-area {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            min-height: 44px;
+        }
+        .spell-btn {
+            padding: 12px 30px; border: none; border-radius: 12px;
+            font-size: 1.1em; font-weight: bold; cursor: pointer; transition: all 0.3s;
+            background: #e74c3c; color: white;
+        }
+        .spell-btn:hover:not(:disabled) { background: #c0392b; transform: translateY(-2px); }
+        .spell-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+        .spell-meaning { font-size: clamp(1.8em, 3.5vw, 2.8em); color: #333; font-weight: 600; line-height: 1.4; }
+        .spell-result { font-size: 1.2em; font-weight: bold; min-height: 30px; }
+        .spell-result.correct { color: #2ecc71; }
+        .spell-result.wrong { color: #e74c3c; }
+
+        /* ===== 拼写模式字母格 ===== */
+        .letter-slots {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .letter-slot {
+            width: 42px; height: 50px;
+            border: none;
+            border-bottom: 3px solid #ccc;
+            border-radius: 6px 6px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8f8fa;
+        }
+        .letter-slot.hint {
+            color: #667eea;
+            background: #eef0ff;
+            border-bottom-color: #667eea;
+        }
+        .letter-slot.active {
+            border-bottom-color: #667eea;
+            background: #e8eaff;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+        }
+        .letter-slot.correct {
+            color: #2ecc71;
+            border-bottom-color: #2ecc71;
+            background: #eafaf1;
+        }
+        .letter-slot.wrong {
+            color: #e74c3c;
+            border-bottom-color: #e74c3c;
+            background: #fdecea;
+        }
+        .letter-slot.revealed {
+            color: #e74c3c;
+            border-bottom-color: #e74c3c;
+            background: #fdecea;
+        }
+        /* 拼写错误动画：闪红 + 两次扩大 */
+        @keyframes spell-error {
+            0%   { transform: scale(1); }
+            15%  { transform: scale(1.05); }
+            30%  { transform: scale(1); }
+            45%  { transform: scale(1.05); }
+            60%  { transform: scale(1); }
+            100% { transform: scale(1); }
+        }
+        .word-card.shake .letter-slots {
+            animation: spell-error 0.6s ease;
+        }
+        .word-card.shake .letter-slot {
+            border-bottom-color: #e74c3c !important;
+            color: #e74c3c !important;
+            background: #fdecea !important;
+        }
+        .hidden-spell-input {
+            position: absolute;
+            opacity: 0;
+            width: 1px; height: 1px;
+            pointer-events: none;
+        }
+
+        /* 按钮下方说明小字 */
+        .btn-hint {
+            text-align: center;
+            font-size: 0.7em;
+            color: #999;
+            margin-top: 6px;
+        }
+
+        .controls-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            flex-shrink: 0;
+            margin-top: auto;
+        }
+
+        /* ===== AI 沟通模式（主内容区聊天界面） ===== */
+        .ai-chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex: 1;
+            min-height: 0;
+        }
+        .ai-chat-header {
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0;
+        }
+        .ai-chat-header h1 {
+            font-size: 1.6em;
+            margin-bottom: 8px;
+        }
+        .ai-chat-header p {
+            font-size: 0.9em;
+            color: #999;
+        }
+        /* 快捷操作区 */
+        .ai-chat-quick {
+            display: flex;
+            gap: 10px;
+            padding: 12px 0;
+            flex-shrink: 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .ai-quick-btn {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e5;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.85em;
+            color: #555;
+            transition: all 0.2s;
+        }
+        .ai-quick-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f8ff;
+        }
+        .ai-quick-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* 消息滚动区 */
+        .ai-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-height: 0;
+        }
+        .ai-chat-msg {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 0.95em;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .ai-chat-msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .ai-chat-msg.assistant {
+            align-self: flex-start;
+            background: #f0f0f5;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+        .ai-chat-msg.loading {
+            color: #999;
+            font-style: italic;
+        }
+        /* 输入区 */
+        .ai-chat-input-area {
+            display: flex;
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid #eee;
+            flex-shrink: 0;
+        }
+        .ai-chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 0.95em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .ai-chat-input:focus {
+            border-color: #667eea;
+        }
+        .ai-chat-send {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        .ai-chat-send:hover:not(:disabled) {
+            opacity: 0.85;
+        }
+        .ai-chat-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ===== 收藏按钮样式 ===== */
+        .favorite-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            font-size: 1.6em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+        }
+        .favorite-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .favorite-btn.favorited {
+            color: #f1c40f;
+        }
+        .favorite-btn:not(.favorited) {
+            color: #bdc3c7;
+        }
+
+        /* ===== 收藏列表弹窗样式 ===== */
+        .favorites-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .favorites-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            width: 580px;
+            max-width: 95vw;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .favorites-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .favorites-modal-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .favorites-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.6em;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+            padding: 5px;
+        }
+        .favorites-modal-close:hover {
+            color: #333;
+        }
+        .favorites-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .favorites-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .favorites-list::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+        .favorites-list::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+        .favorite-item {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 12px;
+            border: 1px solid #e8eaff;
+            transition: all 0.2s;
+        }
+        .favorite-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+        .favorite-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .favorite-word {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .favorite-phonetic {
+            font-size: 0.95em;
+            color: #888;
+            margin-left: 8px;
+        }
+        .favorite-delete-btn {
+            background: none;
+            border: none;
+            font-size: 1.1em;
+            cursor: pointer;
+            color: #e74c3c;
+            opacity: 0.7;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .favorite-delete-btn:hover {
+            opacity: 1;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        .favorite-meaning {
+            color: #555;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+        .favorite-time {
+            font-size: 0.75em;
+            color: #bbb;
+            margin-top: 8px;
+        }
+        .favorites-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .favorites-empty-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        .favorites-loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        /* ===== 错题本弹窗样式 ===== */
+        .mistakes-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .mistakes-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            width: 620px;
+            max-width: 95vw;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .mistakes-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .mistakes-modal-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .mistakes-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.6em;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+            padding: 5px;
+        }
+        .mistakes-modal-close:hover {
+            color: #333;
+        }
+        .mistakes-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .mistakes-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .mistakes-list::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+        .mistakes-list::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+        .mistake-item {
+            background: linear-gradient(135deg, #fff8f8 0%, #fff0f0 100%);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 12px;
+            border: 1px solid #ffe0e0;
+            transition: all 0.2s;
+        }
+        .mistake-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+        }
+        .mistake-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .mistake-word {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        .mistake-phonetic {
+            font-size: 0.95em;
+            color: #888;
+            margin-left: 8px;
+        }
+        .mistake-count {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .mistake-delete-btn {
+            background: none;
+            border: none;
+            font-size: 1.1em;
+            cursor: pointer;
+            color: #999;
+            opacity: 0.7;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-left: 8px;
+        }
+        .mistake-delete-btn:hover {
+            opacity: 1;
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        .mistake-meaning {
+            color: #555;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+        .mistake-time {
+            font-size: 0.75em;
+            color: #bbb;
+            margin-top: 8px;
+        }
+        .mistakes-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .mistakes-empty-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        .mistakes-loading {
+            text-align: center;
+            padding: 40px;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Toast 提示 -->
+        <div class="toast" :class="{ show: toastVisible }">{{ toastMessage }}</div>
+
+        <div class="app-layout">
+
+            <!-- 左侧边界触发区（侧边栏隐藏时出现） -->
+            <div v-if="sidebarsHidden" class="edge-trigger left" @mouseenter="showSidebars"></div>
+
+            <!-- 右侧边界触发区 -->
+            <div v-if="sidebarsHidden" class="edge-trigger right" @mouseenter="showSidebars"></div>
+
+            <!-- ===== 左侧边栏 ===== -->
+            <div class="sidebar-left" :class="{ hidden: sidebarsHidden }">
+                <div class="mode-item" :class="{ active: currentMode === 'reading' }" @click="currentMode = 'reading'">
+                    <span class="mode-icon">📖</span>
+                    <span class="mode-label">阅读模式</span>
+                </div>
+                <div class="mode-item" :class="{ active: currentMode === 'spelling' }" @click="switchToSpelling">
+                    <span class="mode-icon">✏️</span>
+                    <span class="mode-label">拼写模式</span>
+                </div>
+                <div class="mode-item pending" @click="showToast('听力模式 - 功能开发中')">
+                    <span class="mode-icon">🎧</span>
+                    <span class="mode-label">听力模式</span>
+                </div>
+                <div class="mode-item" :class="{ active: currentMode === 'random' }" @click="switchToRandom">
+                    <span class="mode-icon">🔀</span>
+                    <span class="mode-label">随机模式</span>
+                </div>
+                <div class="mode-item" :class="{ active: currentMode === 'ai' }" @click="switchToAi">
+                    <span class="mode-icon">🤖</span>
+                    <span class="mode-label">AI沟通</span>
+                </div>
+            </div>
+
+            <!-- ===== 中间主内容区 ===== -->
+            <div class="main-content">
+                <!-- 阅读模式 -->
+                <template v-if="currentMode === 'reading'">
+                    <h1>📚 英语单词学习</h1>
+                    <div v-if="loading" class="loading">加载中...</div>
+                    <div v-else-if="error" class="error">{{ error }}</div>
+                    <div v-else-if="readingWord" class="word-card">
+                        <button class="favorite-btn" :class="{ favorited: readingWordIsFavorite }" @click="toggleFavorite" :title="readingWordIsFavorite ? '取消收藏' : '收藏此单词'" v-if="currentUser">
+                            {{ readingWordIsFavorite ? '⭐' : '☆' }}
+                        </button>
+                        <div class="word-title">{{ readingWord.word }}</div>
+                        <div class="phonetic" v-if="readingWord.phonetic">{{ readingWord.phonetic }}</div>
+                        <div class="meaning">{{ readingWord.meaning }}</div>
+                        <div class="example" v-if="readingWord.example">
+                            <div class="example-header">
+                                <div class="example-text"><strong>例句：</strong>{{ readingWord.example }}</div>
+                                <button v-if="readingWord.example_translation" class="example-translate-btn" :class="{ active: readingTranslationVisible }" @click="readingTranslationVisible = !readingTranslationVisible" title="显示/隐藏翻译">🌐</button>
+                            </div>
+                            <div class="example-translation" :class="{ show: readingTranslationVisible }">
+                                <div class="example-translation-inner">{{ readingWord.example_translation }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="controls" v-if="readingWord && !loading">
+                        <button class="btn btn-prev" @click="prevWord" :disabled="readingIsFirst || loading">← 上一个</button>
+                        <button class="btn btn-next" @click="nextWord" :disabled="readingIsLast || loading">下一个 →</button>
+                    </div>
+                    <div class="progress" v-if="readingWord && !loading">
+                        第 {{ readingWord.id }} / {{ total }} 个单词
+                    </div>
+                </template>
+
+                <!-- 拼写模式 -->
+                <template v-if="currentMode === 'spelling'">
+                    <h1>✏️ 拼写模式</h1>
+                    <div v-if="loading" class="loading">加载中...</div>
+                    <div v-else-if="error" class="error">{{ error }}</div>
+                    <div v-else-if="spellingWord" class="word-card" :class="{ shake: spellShake }">
+                        <button class="favorite-btn" :class="{ favorited: spellingWordIsFavorite }" @click="toggleFavorite" :title="spellingWordIsFavorite ? '取消收藏' : '收藏此单词'" v-if="currentUser">
+                            {{ spellingWordIsFavorite ? '⭐' : '☆' }}
+                        </button>
+                        <div class="spell-meaning">{{ spellingWord.meaning }}</div>
+                        <input ref="hiddenInput" class="hidden-spell-input" type="text" autocomplete="off" @input="onHiddenInput" @keydown="onHiddenKeydown" />
+                        <div class="letter-slots">
+                            <div v-for="(slot, index) in letterSlots" :key="index"
+                                class="letter-slot"
+                                :class="{
+                                    hint: slot.isHint,
+                                    active: spellingActiveSlot === index,
+                                    correct: spellResult === 'correct' && slot.display && slot.display.toLowerCase() === spellingWord.word[index].toLowerCase(),
+                                    wrong: spellResult === 'correct' && slot.display && slot.display.toLowerCase() !== spellingWord.word[index].toLowerCase(),
+                                    revealed: spellResult === 'revealed'
+                                }"
+                                @click="onSlotClick(index)">
+                                {{ slot.display }}
+                            </div>
+                        </div>
+                        <div class="spell-btn-area">
+                            <button class="spell-btn" @click="showAnswer" v-show="!spellResult">我不会</button>
+                        </div>
+                        <div class="spell-result" :class="spellResult">
+                            <template v-if="spellResult === 'correct'">✅ 拼写正确！</template>
+                            <template v-if="spellResult === 'revealed'">正确答案：{{ spellingWord.word }}</template>
+                        </div>
+                    </div>
+                    <div class="controls" v-if="spellingWord && !loading">
+                        <button class="btn btn-prev" @click="prevWordSpell" :disabled="spellingIsFirst || loading">← 上一个</button>
+                        <button class="btn btn-next" @click="nextWordSpell" :disabled="spellingIsLast || loading || (spellResult !== 'correct' && spellResult !== 'revealed')">下一个 →</button>
+                    </div>
+                    <div class="progress" v-if="spellingWord && !loading">第 {{ spellingWord.id }} / {{ total }} 个单词</div>
+                </template>
+
+                <!-- 随机模式 -->
+                <template v-if="currentMode === 'random'">
+                    <h1>🔀 随机模式</h1>
+                    <div v-if="loading" class="loading">加载中...</div>
+                    <div v-else-if="error" class="error">{{ error }}</div>
+                    <div v-else-if="randomWord" class="word-card">
+                        <button class="favorite-btn" :class="{ favorited: randomWordIsFavorite }" @click="toggleFavorite" :title="randomWordIsFavorite ? '取消收藏' : '收藏此单词'" v-if="currentUser">
+                            {{ randomWordIsFavorite ? '⭐' : '☆' }}
+                        </button>
+                        <div class="word-title">{{ randomWord.word }}</div>
+                        <div class="phonetic" v-if="randomWord.phonetic">{{ randomWord.phonetic }}</div>
+                        <div class="meaning">{{ randomWord.meaning }}</div>
+                        <div class="example" v-if="randomWord.example">
+                            <div class="example-header">
+                                <div class="example-text"><strong>例句：</strong>{{ randomWord.example }}</div>
+                                <button v-if="randomWord.example_translation" class="example-translate-btn" :class="{ active: randomTranslationVisible }" @click="randomTranslationVisible = !randomTranslationVisible" title="显示/隐藏翻译">🌐</button>
+                            </div>
+                            <div class="example-translation" :class="{ show: randomTranslationVisible }">
+                                <div class="example-translation-inner">{{ randomWord.example_translation }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="controls-wrap" v-if="randomWord && !loading">
+                        <div class="controls">
+                            <button class="btn btn-prev" @click="reviewSeenWord" :disabled="seenWordIds.length <= 1 || loading">🔀 换一个</button>
+                            <button class="btn btn-next" @click="fetchNewRandomWord" :disabled="loading">🎲 再来一个</button>
+                        </div>
+                        <div style="display: flex; gap: 20px;">
+                            <span class="btn-hint" style="flex: 1; text-align: center;">从已刷过的单词中随机展示</span>
+                            <span class="btn-hint" style="flex: 1; text-align: center;">随机刷一个新单词</span>
+                        </div>
+                    </div>
+                    <div class="progress" v-if="randomWord && !loading">
+                        已刷 {{ seenWordIds.length }} / {{ total }} 个单词
+                    </div>
+                </template>
+
+                <!-- AI 沟通模式 -->
+                <template v-if="currentMode === 'ai'">
+                    <div class="ai-chat-container">
+                        <div class="ai-chat-header">
+                            <h1>🤖 AI 英语助手</h1>
+                            <p>问我任何关于英语的问题，我会为你解答</p>
+                        </div>
+                        <!-- 快捷操作 -->
+                        <div class="ai-chat-quick">
+                            <button class="ai-quick-btn" @click="aiQuickAsk('explain')" :disabled="aiLoading">📖 解释一个单词</button>
+                            <button class="ai-quick-btn" @click="aiQuickAsk('examples')" :disabled="aiLoading">💬 生成例句</button>
+                            <button class="ai-quick-btn" @click="aiQuickAsk('grammar')" :disabled="aiLoading">📝 语法讲解</button>
+                            <button class="ai-quick-btn" @click="aiQuickAsk('translate')" :disabled="aiLoading">🌐 翻译句子</button>
+                        </div>
+                        <!-- 消息列表 -->
+                        <div class="ai-chat-messages" ref="aiChatMessages">
+                            <div v-if="aiMessages.length === 0" style="text-align: center; color: #ccc; margin-top: 60px; font-size: 1em; line-height: 2;">
+                                👋 你好！我是你的 AI 英语助手<br>你可以问我单词含义、语法问题，或让我翻译句子<br>也可以点击上方快捷按钮
+                            </div>
+                            <div v-for="(msg, idx) in aiMessages" :key="idx"
+                                class="ai-chat-msg" :class="msg.role">
+                                {{ msg.content }}
+                            </div>
+                        </div>
+                        <!-- 输入区 -->
+                        <div class="ai-chat-input-area">
+                            <input class="ai-chat-input" v-model="aiInput" placeholder="输入你的英语问题..."
+                                @keydown.enter="sendAiChat" :disabled="aiLoading" ref="aiChatInput" />
+                            <button class="ai-chat-send" @click="sendAiChat" :disabled="aiLoading || !aiInput.trim()">
+                                {{ aiLoading ? '...' : '发送' }}
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- ===== 右侧边栏 ===== -->
+            <div class="sidebar-right" :class="{ hidden: sidebarsHidden }">
+                <div class="avatar-area" title="个人中心" @click="openProfileModal" :style="currentUser ? { background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)' } : {}">
+                    {{ currentUser ? (currentUser.nickname ? currentUser.nickname[0] : '👤') : '👤' }}
+                </div>
+                <div class="menu-item" @click="showToast('个人手册 - 功能开发中')">
+                    <span class="menu-icon">📘</span>
+                    <span class="menu-text">手册</span>
+                    <span class="tooltip">个人手册</span>
+                </div>
+                <div class="menu-item" @click="openMistakesModal">
+                    <span class="menu-icon">📝</span>
+                    <span class="menu-text">错题</span>
+                    <span class="tooltip">错题本</span>
+                </div>
+                <div class="menu-item" @click="openFavoritesModal">
+                    <span class="menu-icon">⭐</span>
+                    <span class="menu-text">收藏</span>
+                    <span class="tooltip">我的收藏</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="toggle-btn" @click="toggleSidebars" :title="sidebarsHidden ? '显示侧栏' : '隐藏侧栏'">
+                    {{ sidebarsHidden ? '▶' : '◀' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 登录弹窗 -->
+        <div v-if="showLoginModal" class="login-modal-overlay" @click.self="showLoginModal = false">
+            <div class="login-modal">
+                <div class="login-modal-title">🔐 用户登录</div>
+                <div class="login-modal-sub">请输入邮箱和密码登录系统</div>
+                <div class="form-group">
+                    <label class="form-label">邮箱</label>
+                    <input class="form-input" type="email" v-model="loginEmail" placeholder="请输入邮箱" @keydown.enter="$refs.loginPwdInput.focus()" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input class="form-input" type="password" ref="loginPwdInput" v-model="loginPassword" placeholder="请输入密码" @keydown.enter="handleLogin" />
+                </div>
+                <div class="login-error-msg" v-if="loginError">{{ loginError }}</div>
+                <button class="login-submit-btn" @click="handleLogin" :disabled="loginLoading || !loginEmail || !loginPassword">
+                    {{ loginLoading ? '登录中...' : '登 录' }}
+                </button>
+                <div class="login-footer">
+                    <a @click="openRegisterModal">注册新账号</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 注册弹窗 -->
+        <div v-if="showRegisterModal" class="register-modal-overlay" @click.self="showRegisterModal = false">
+            <div class="register-modal">
+                <div class="register-modal-title">📝 注册账号</div>
+                <div class="register-modal-sub">填写以下信息完成注册</div>
+                <div class="form-group">
+                    <label class="form-label">昵称</label>
+                    <input class="form-input" type="text" v-model="registerNickname" placeholder="请输入昵称" @keydown.enter="$refs.registerEmailInput.focus()" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">邮箱</label>
+                    <input class="form-input" type="email" ref="registerEmailInput" v-model="registerEmail" placeholder="请输入邮箱（将作为登录账号）" @keydown.enter="$refs.registerPwdInput.focus()" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input class="form-input" type="password" ref="registerPwdInput" v-model="registerPassword" placeholder="请输入密码（至少6位）" @keydown.enter="handleRegister" />
+                </div>
+                <div class="register-error-msg" v-if="registerError">{{ registerError }}</div>
+                <div class="register-success-msg" v-if="registerSuccess">{{ registerSuccess }}</div>
+                <button class="register-submit-btn" @click="handleRegister" :disabled="registerLoading || !registerNickname || !registerEmail || !registerPassword">
+                    {{ registerLoading ? '注册中...' : '注 册' }}
+                </button>
+                <div class="register-footer">
+                    <a @click="backToLogin">已有账号？返回登录</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 个人信息表单弹窗 -->
+        <div v-if="showProfileModal" class="profile-modal-overlay" @click.self="showProfileModal = false">
+            <div class="profile-modal">
+                <button class="profile-modal-close" @click="showProfileModal = false">&times;</button>
+                <div class="profile-modal-header">
+                    <div class="profile-modal-avatar">{{ currentUser.nickname ? currentUser.nickname[0] : '👤' }}</div>
+                    <div class="profile-modal-email">{{ currentUser.email || '未设置邮箱' }}</div>
+                    <div class="profile-modal-role">{{ currentUser.role === 'admin' ? '管理员' : '普通用户' }}</div>
+                </div>
+                <div class="profile-form-group">
+                    <label>昵称</label>
+                    <input type="text" v-model="profileForm.nickname" placeholder="请输入昵称" />
+                </div>
+                <div class="profile-form-group">
+                    <label>修改密码</label>
+                    <input type="password" v-model="profileForm.password" placeholder="留空则不修改" />
+                    <div class="field-hint">如需修改密码请输入新密码，留空保持不变</div>
+                </div>
+                <div class="profile-save-msg" :class="profileSaveMsg.type" v-if="profileSaveMsg.text">{{ profileSaveMsg.text }}</div>
+                <button class="profile-save-btn" @click="saveProfile" :disabled="profileSaving">
+                    {{ profileSaving ? '保存中...' : '保存修改' }}
+                </button>
+                <div class="profile-divider"></div>
+                <a v-if="currentUser.role === 'admin'" href="/management" style="display:block;width:100%;padding:11px;border:none;border-radius:12px;background:#f0f0ff;color:#667eea;font-size:0.9em;font-weight:500;cursor:pointer;text-align:center;text-decoration:none;margin-bottom:8px;transition:all 0.2s;" onmouseover="this.style.background='#e0e0ff'" onmouseout="this.style.background='#f0f0ff'">⚙️ 进入管理中心</a>
+                <button class="profile-logout-btn" @click="handleLogout">🚪 退出登录</button>
+            </div>
+        </div>
+
+        <!-- 收藏列表弹窗 -->
+        <div v-if="showFavoritesModal" class="favorites-modal-overlay" @click.self="showFavoritesModal = false">
+            <div class="favorites-modal">
+                <div class="favorites-modal-header">
+                    <div class="favorites-modal-title">⭐ 我的收藏</div>
+                    <button class="favorites-modal-close" @click="showFavoritesModal = false">&times;</button>
+                </div>
+                <div v-if="favoritesLoading" class="favorites-loading">加载中...</div>
+                <div v-else-if="favoritesList.length === 0" class="favorites-empty">
+                    <div class="favorites-empty-icon">⭐</div>
+                    <div>还没有收藏任何单词</div>
+                    <div style="font-size: 0.9em; margin-top: 8px;">在学习单词时点击右上角的星星即可收藏</div>
+                </div>
+                <div v-else class="favorites-list">
+                    <div v-for="(item, index) in favoritesList" :key="index" class="favorite-item">
+                        <div class="favorite-item-header">
+                            <div>
+                                <span class="favorite-word">{{ item.word }}</span>
+                                <span class="favorite-phonetic" v-if="item.phonetic">{{ item.phonetic }}</span>
+                            </div>
+                            <button class="favorite-delete-btn" @click="deleteFavorite(item.id)" title="取消收藏">🗑️</button>
+                        </div>
+                        <div class="favorite-meaning">{{ item.meaning }}</div>
+                        <div class="favorite-time">收藏于：{{ item.favorited_at }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 错题本弹窗 -->
+        <div v-if="showMistakesModal" class="mistakes-modal-overlay" @click.self="showMistakesModal = false">
+            <div class="mistakes-modal">
+                <div class="mistakes-modal-header">
+                    <div class="mistakes-modal-title">📝 我的错题本</div>
+                    <button class="mistakes-modal-close" @click="showMistakesModal = false">&times;</button>
+                </div>
+                <div v-if="mistakesLoading" class="mistakes-loading">加载中...</div>
+                <div v-else-if="mistakesList.length === 0" class="mistakes-empty">
+                    <div class="mistakes-empty-icon">📝</div>
+                    <div>错题本为空，继续保持！</div>
+                    <div style="font-size: 0.9em; margin-top: 8px;">在拼写模式中答错的单词会自动加入错题本</div>
+                </div>
+                <div v-else class="mistakes-list">
+                    <div v-for="(item, index) in mistakesList" :key="index" class="mistake-item">
+                        <div class="mistake-item-header">
+                            <div>
+                                <span class="mistake-word">{{ item.word }}</span>
+                                <span class="mistake-phonetic" v-if="item.phonetic">{{ item.phonetic }}</span>
+                            </div>
+                            <div>
+                                <span class="mistake-count">错误 {{ item.mistake_count }} 次</span>
+                                <button class="mistake-delete-btn" @click="deleteMistake(item.user_id, item.id)" title="移出错题本">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="mistake-meaning">{{ item.meaning }}</div>
+                        <div class="mistake-time">最后错误：{{ item.last_mistake_at }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    readingWord: null,        // 阅读模式当前 word
+                    spellingWord: null,       // 拼写模式 current word
+                    randomWord: null,         // 随机模式 current word
+                    firstId: null,
+                    lastId: null,
+                    total: 0,
+                    loading: false,
+                    error: null,
+                    currentMode: 'reading',
+                    sidebarsHidden: false,
+                    spellInput: '',
+                    spellResult: null,
+                    spellingHintPositions: [],
+                    spellingAnswer: [],
+                    spellingActiveSlot: -1,
+                    spellShake: false,
+                    spellingWordResults: {},  // { wordId: { result: 'correct'|'revealed', answer: [], hints: [] } }
+                    seenWordIds: [],
+                    toastVisible: false,
+                    toastMessage: '',
+                    toastTimer: null,
+                    readingTranslationVisible: false,
+                    randomTranslationVisible: false,
+                    // AI 助手相关状态
+                    aiMessages: [],         // 对话消息列表 [{role: 'user'|'assistant', content: '...'}]
+                    aiInput: '',            // 用户输入框内容
+                    aiLoading: false,       // AI 是否正在响应
+                    // 登录相关
+                    showLoginModal: false,    // 是否显示登录弹窗
+                    showRegisterModal: false, // 是否显示注册弹窗
+                    showProfileModal: false,  // 是否显示个人信息弹窗
+                    currentUser: null,        // 当前登录用户
+                    loginEmail: '',           // 登录邮箱（替代原用户名）
+                    loginPassword: '',        // 登录密码
+                    loginLoading: false,      // 登录中
+                    loginError: '',           // 登录错误信息
+                    // 注册相关
+                    registerNickname: '',     // 注册昵称
+                    registerEmail: '',        // 注册邮箱
+                    registerPassword: '',     // 注册密码
+                    registerLoading: false,   // 注册中
+                    registerError: '',        // 注册错误信息
+                    registerSuccess: '',      // 注册成功提示
+                    // 个人信息表单（仅昵称和密码可修改）
+                    profileForm: { nickname: '', password: '' },
+                    profileSaving: false,
+                    profileSaveMsg: { text: '', type: '' },
+                    // 收藏功能相关状态
+                    readingWordIsFavorite: false,     // 阅读模式当前单词是否已收藏
+                    spellingWordIsFavorite: false,    // 拼写模式当前单词是否已收藏
+                    randomWordIsFavorite: false,      // 随机模式当前单词是否已收藏
+                    showFavoritesModal: false,        // 是否显示收藏列表弹窗
+                    favoritesList: [],                // 收藏列表
+                    favoritesLoading: false,          // 收藏列表加载中
+                    // 错题本功能相关状态
+                    showMistakesModal: false,         // 是否显示错题本弹窗
+                    mistakesList: [],                 // 错题列表
+                    mistakesLoading: false            // 错题列表加载中
+                };
+            },
+            computed: {
+                // 阅读模式
+                readingIsFirst() { return this.readingWord && this.readingWord.id === this.firstId; },
+                readingIsLast() { return this.readingWord && this.readingWord.id === this.lastId; },
+                // 拼写模式
+                spellingIsFirst() { return this.spellingWord && this.spellingWord.id === this.firstId; },
+                spellingIsLast() { return this.spellingWord && this.spellingWord.id === this.lastId; },
+                hintCount() {
+                    if (!this.spellingWord) return 0;
+                    return Math.floor(this.spellingWord.word.length / 2.5);
+                },
+                letterSlots() {
+                    if (!this.spellingWord) return [];
+                    const word = this.spellingWord.word;
+                    return word.split('').map((letter, i) => {
+                        const isHint = this.spellingHintPositions.includes(i);
+                        let display = '';
+                        if (isHint) display = letter;
+                        else if (this.spellingAnswer[i]) display = this.spellingAnswer[i];
+                        return { letter, isHint, display };
+                    });
+                },
+            },
+            methods: {
+                // ===== 登录相关 =====
+                toggleLoginModal() {
+                    this.showLoginModal = !this.showLoginModal;
+                    this.loginError = '';
+                },
+                openProfileModal() {
+                    if (this.currentUser) {
+                        // 已登录：打开个人信息表单，回填昵称（邮箱仅展示不可修改）
+                        this.profileForm = {
+                            nickname: this.currentUser.nickname || '',
+                            password: ''
+                        };
+                        this.profileSaveMsg = { text: '', type: '' };
+                        this.showProfileModal = true;
+                    } else {
+                        // 未登录：显示登录弹窗
+                        this.showLoginModal = true;
+                        this.loginError = '';
+                    }
+                },
+                openRegisterModal() {
+                    // 关闭登录弹窗，打开注册弹窗，重置注册表单状态
+                    this.showLoginModal = false;
+                    this.showRegisterModal = true;
+                    this.registerNickname = '';
+                    this.registerEmail = '';
+                    this.registerPassword = '';
+                    this.registerError = '';
+                    this.registerSuccess = '';
+                },
+                backToLogin() {
+                    // 关闭注册弹窗，返回登录弹窗
+                    this.showRegisterModal = false;
+                    this.showLoginModal = true;
+                    this.loginError = '';
+                },
+                async handleRegister() {
+                    // 1. 校验昵称不为空
+                    if (!this.registerNickname.trim()) {
+                        this.registerError = '请输入昵称';
+                        return;
+                    }
+                    // 2. 校验邮箱格式
+                    if (!this.registerEmail.includes('@') || !this.registerEmail.includes('.')) {
+                        this.registerError = '请输入正确的邮箱地址';
+                        return;
+                    }
+                    // 3. 校验密码长度
+                    if (this.registerPassword.length < 6) {
+                        this.registerError = '密码长度不能少于6位';
+                        return;
+                    }
+                    try {
+                        this.registerLoading = true;
+                        this.registerError = '';
+                        this.registerSuccess = '';
+                        // 4. 调用注册接口
+                        const res = await axios.post('http://localhost:3000/api/auth/register', {
+                            nickname: this.registerNickname.trim(),
+                            email: this.registerEmail.trim(),
+                            password: this.registerPassword
+                        });
+                        // 5. 注册成功，提示后跳转登录
+                        this.registerSuccess = '注册成功！即将跳转到登录...';
+                        setTimeout(() => {
+                            this.showRegisterModal = false;
+                            this.showLoginModal = true;
+                            this.loginEmail = this.registerEmail.trim(); // 自动填入邮箱
+                            this.loginPassword = '';
+                            this.registerSuccess = '';
+                        }, 1500);
+                    } catch (err) {
+                        this.registerError = err.response?.data?.detail || '注册失败，请检查网络';
+                    } finally {
+                        this.registerLoading = false;
+                    }
+                },
+                async handleLogin() {
+                    if (!this.loginEmail || !this.loginPassword) return;
+                    try {
+                        this.loginLoading = true;
+                        this.loginError = '';
+                        // 使用邮箱 + 密码调用登录接口
+                        const res = await axios.post('http://localhost:3000/api/auth/login', {
+                            email: this.loginEmail,
+                            password: this.loginPassword
+                        });
+                        this.currentUser = res.data.user;
+                        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+                        this.showLoginModal = false;
+                        this.loginEmail = '';
+                        this.loginPassword = '';
+                        this.showToast('登录成功，欢迎 ' + (this.currentUser.nickname || this.currentUser.username));
+                        // 登录成功后刷新页面
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                    } catch (err) {
+                        this.loginError = err.response?.data?.detail || '登录失败，请检查邮箱和密码';
+                    } finally {
+                        this.loginLoading = false;
+                    }
+                },
+                handleLogout() {
+                    this.currentUser = null;
+                    this.showProfileModal = false;
+                    localStorage.removeItem('currentUser');
+                    this.showToast('已退出登录');
+                    // 退出登录后刷新页面
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                },
+                async saveProfile() {
+                    if (!this.currentUser || this.profileSaving) return;
+                    try {
+                        this.profileSaving = true;
+                        this.profileSaveMsg = { text: '', type: '' };
+                        const data = {};
+                        // 仅判断昵称是否修改
+                        if (this.profileForm.nickname !== (this.currentUser.nickname || '')) data.nickname = this.profileForm.nickname;
+                        // 判断密码是否填写（留空则不修改）
+                        if (this.profileForm.password.trim()) data.password = this.profileForm.password;
+                        if (Object.keys(data).length === 0) {
+                            this.profileSaveMsg = { text: '没有修改任何内容', type: 'error' };
+                            return;
+                        }
+                        const res = await axios.put(`http://localhost:3000/api/auth/profile/${this.currentUser.id}`, data);
+                        // 更新本地存储
+                        this.currentUser = res.data;
+                        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+                        this.profileSaveMsg = { text: '保存成功！', type: 'success' };
+                        this.profileForm.password = '';
+                    } catch (err) {
+                        this.profileSaveMsg = { text: err.response?.data?.detail || '保存失败', type: 'error' };
+                    } finally {
+                        this.profileSaving = false;
+                    }
+                },
+                checkLoginStatus() {
+                    const saved = localStorage.getItem('currentUser');
+                    if (saved) {
+                        try { this.currentUser = JSON.parse(saved); } catch(e) {}
+                    }
+                },
+
+                // 初始化：获取单词总数和第一个单词（阅读模式）
+                async fetchCurrentWord() {
+                    try {
+                        this.loading = true;
+                        this.error = null;
+                        const [boundsRes, countRes] = await Promise.all([
+                            axios.get('http://localhost:3000/api/words/first-last'),
+                            axios.get('http://localhost:3000/api/words/count')
+                        ]);
+                        this.firstId = boundsRes.data.first_id;
+                        this.lastId = boundsRes.data.last_id;
+                        this.total = countRes.data.total;
+                        const wordRes = await axios.get('http://localhost:3000/api/words/current');
+                        this.readingWord = wordRes.data;
+                        this.readingTranslationVisible = false;
+                    } catch (err) {
+                        console.error('获取单词失败:', err);
+                        this.error = '获取单词失败，请确保后端服务正在运行';
+                    } finally { this.loading = false; }
+                },
+
+                // ===== 阅读模式 =====
+                async nextWord() {
+                    if (this.readingIsLast || this.loading) return;
+                    try {
+                        this.loading = true; this.error = null;
+                        const res = await axios.get(`http://localhost:3000/api/words/next/${this.readingWord.id}`);
+                        if (res.data) { this.readingWord = res.data; this.readingTranslationVisible = false; }
+                    } catch (err) { console.error(err); this.error = '获取下一个单词失败'; }
+                    finally { this.loading = false; }
+                },
+                async prevWord() {
+                    if (this.readingIsFirst || this.loading) return;
+                    try {
+                        this.loading = true; this.error = null;
+                        const res = await axios.get(`http://localhost:3000/api/words/prev/${this.readingWord.id}`);
+                        if (res.data) { this.readingWord = res.data; this.readingTranslationVisible = false; }
+                    } catch (err) { console.error(err); this.error = '获取上一个单词失败'; }
+                    finally { this.loading = false; }
+                },
+
+                // ===== 拼写模式 =====
+                generateHints() {
+                    const word = this.spellingWord.word;
+                    const len = word.length;
+                    const count = Math.floor(len / 2.5);
+                    const positions = [];
+                    const indices = Array.from({ length: len }, (_, i) => i);
+                    for (let i = 0; i < count; i++) {
+                        const randIdx = Math.floor(Math.random() * indices.length);
+                        positions.push(indices[randIdx]);
+                        indices.splice(randIdx, 1);
+                    }
+                    this.spellingHintPositions = positions.sort((a, b) => a - b);
+                    this.spellingAnswer = new Array(len).fill('');
+                    this.spellingActiveSlot = -1;
+                    this.$nextTick(() => this.focusFirstEmptySlot());
+                },
+                focusInput() {
+                    this.$nextTick(() => {
+                        if (this.$refs.hiddenInput) {
+                            this.$refs.hiddenInput.value = '';
+                            this.$refs.hiddenInput.focus();
+                        }
+                    });
+                },
+                focusFirstEmptySlot() {
+                    const firstEmpty = this.letterSlots.findIndex(s => !s.isHint);
+                    this.spellingActiveSlot = firstEmpty !== -1 ? firstEmpty : 0;
+                    this.focusInput();
+                },
+                onSlotClick(index) {
+                    if (this.spellResult) return;
+                    const slot = this.letterSlots[index];
+                    if (slot.isHint) {
+                        const next = this.letterSlots.findIndex((s, i) => i > index && !s.isHint);
+                        if (next !== -1) {
+                            this.spellingActiveSlot = next;
+                        }
+                        return;
+                    }
+                    this.spellingActiveSlot = index;
+                    this.focusInput();
+                },
+                onHiddenInput(e) {
+                    const val = e.target.value;
+                    if (!val || this.spellingActiveSlot < 0) {
+                        e.target.value = '';
+                        return;
+                    }
+                    const lastChar = val[val.length - 1];
+                    if (lastChar === ' ') { e.target.value = ''; return; }
+                    // 填入字母
+                    if (this.spellingActiveSlot >= 0 && !this.letterSlots[this.spellingActiveSlot].isHint) {
+                        this.spellingAnswer[this.spellingActiveSlot] = lastChar;
+                        // 自动跳到下一个非提示空格
+                        let next = this.spellingActiveSlot + 1;
+                        while (next < this.letterSlots.length && this.letterSlots[next].isHint) next++;
+                        if (next < this.letterSlots.length) {
+                            this.spellingActiveSlot = next;
+                        }
+                    }
+                    e.target.value = '';
+                    this.$nextTick(() => {
+                        if (this.$refs.hiddenInput) this.$refs.hiddenInput.focus();
+                    });
+                    // 检查是否所有非提示格都已填满，自动判断
+                    const allFilled = this.letterSlots.every((s, i) => s.isHint || this.spellingAnswer[i]);
+                    if (allFilled) {
+                        setTimeout(() => this.checkSpelling(), 300);
+                    }
+                },
+                onHiddenKeydown(e) {
+                    if (e.key === 'Backspace') {
+                        e.preventDefault();
+                        if (this.spellingAnswer[this.spellingActiveSlot]) {
+                            this.spellingAnswer[this.spellingActiveSlot] = '';
+                        } else {
+                            let prev = this.spellingActiveSlot - 1;
+                            while (prev >= 0 && this.letterSlots[prev].isHint) prev--;
+                            if (prev >= 0) {
+                                this.spellingAnswer[prev] = '';
+                                this.spellingActiveSlot = prev;
+                            }
+                        }
+                        this.$nextTick(() => {
+                            if (this.$refs.hiddenInput) {
+                                this.$refs.hiddenInput.value = '';
+                                this.$refs.hiddenInput.focus();
+                            }
+                        });
+                    }
+                },
+                saveCurrentWordState(includeRevealed = false) {
+                    if (!this.spellingWord) return;
+                    const id = this.spellingWord.id;
+                    if (this.spellResult === 'correct') {
+                        // 绿色通过：始终保存
+                        this.spellingWordResults[id] = {
+                            result: 'correct',
+                            answer: [...this.spellingAnswer],
+                            hints: [...this.spellingHintPositions]
+                        };
+                    } else if (includeRevealed && this.spellResult === 'revealed') {
+                        // 红色"我不会"：仅模式切换时保存，模式内导航不保存
+                        this.spellingWordResults[id] = {
+                            result: 'revealed',
+                            answer: [...this.spellingAnswer],
+                            hints: [...this.spellingHintPositions]
+                        };
+                    }
+                    // 未答对（正在输入中）：不保存
+                },
+                restoreWordState() {
+                    const id = this.spellingWord.id;
+                    const saved = this.spellingWordResults[id];
+                    if (saved && (saved.result === 'correct' || saved.result === 'revealed')) {
+                        // 有保存的状态（绿色通过 或 模式切换保留的红色"我不会"）：恢复
+                        this.spellingHintPositions = [...saved.hints];
+                        this.spellingAnswer = [...saved.answer];
+                        this.spellResult = saved.result;
+                        this.spellingActiveSlot = -1;
+                    } else {
+                        // 无记录：重新生成提示
+                        this.generateHints();
+                    }
+                },
+                // 模式内导航专用：到达目标单词后调用
+                // 清除 revealed 保存记录（来自模式切换），只恢复 correct
+                restoreForNavigation() {
+                    const id = this.spellingWord.id;
+                    const saved = this.spellingWordResults[id];
+                    if (saved && saved.result === 'revealed') {
+                        // 之前通过模式切换保存的红色状态：清除，需要重新拼写
+                        delete this.spellingWordResults[id];
+                        this.generateHints();
+                    } else {
+                        // correct 或无记录：正常恢复
+                        this.restoreWordState();
+                    }
+                },
+                async nextWordSpell() {
+                    if (this.spellingIsLast || this.loading) return;
+                    this.saveCurrentWordState();
+                    try {
+                        this.loading = true; this.error = null;
+                        const res = await axios.get(`http://localhost:3000/api/words/next/${this.spellingWord.id}`);
+                        if (res.data) { this.spellingWord = res.data; this.resetSpell(); this.restoreForNavigation(); }
+                    } catch (err) { console.error(err); this.error = '获取下一个单词失败'; }
+                    finally { this.loading = false; }
+                },
+                async prevWordSpell() {
+                    if (this.spellingIsFirst || this.loading) return;
+                    this.saveCurrentWordState();
+                    try {
+                        this.loading = true; this.error = null;
+                        const res = await axios.get(`http://localhost:3000/api/words/prev/${this.spellingWord.id}`);
+                        if (res.data) { this.spellingWord = res.data; this.resetSpell(); this.restoreForNavigation(); }
+                    } catch (err) { console.error(err); this.error = '获取上一个单词失败'; }
+                    finally { this.loading = false; }
+                },
+                checkSpelling() {
+                    if (!this.spellingWord) return;
+                    const word = this.spellingWord.word;
+                    const answer = word.split('').map((letter, i) => {
+                        if (this.spellingHintPositions.includes(i)) return letter;
+                        return this.spellingAnswer[i] || '';
+                    });
+                    const isCorrect = answer.join('').toLowerCase() === word.toLowerCase();
+                    if (isCorrect) {
+                        this.spellResult = 'correct';
+                        // 拼写正确，减少错误次数
+                        this.reduceMistake(this.spellingWord.id);
+                    } else {
+                        // 错误：闪红+抖动动画，然后重置让用户重试
+                        this.spellShake = true;
+                        // 添加到错题本
+                        this.addMistake(this.spellingWord.id);
+                        setTimeout(() => {
+                            this.spellShake = false;
+                            this.spellingAnswer = new Array(word.length).fill('');
+                            this.spellingActiveSlot = -1;
+                            this.focusFirstEmptySlot();
+                        }, 600);
+                    }
+                },
+                showAnswer() {
+                    if (!this.spellingWord) return;
+                    const word = this.spellingWord.word;
+                    this.spellingAnswer = word.split('').map((letter, i) => {
+                        if (this.spellingHintPositions.includes(i)) return letter;
+                        return letter;
+                    });
+                    this.spellResult = 'revealed';
+                    // 点击"我不会"，添加到错题本
+                    this.addMistake(this.spellingWord.id);
+                },
+                goNextAfterCorrect() {
+                    if (this.spellResult !== 'correct') return;
+                    if (!this.spellingIsLast) this.nextWordSpell();
+                },
+                resetSpell() {
+                    this.spellInput = '';
+                    this.spellResult = null;
+                    this.spellingActiveSlot = -1;
+                    this.spellingAnswer = [];
+                    this.spellingHintPositions = [];
+                },
+
+                // ===== 随机模式 =====
+                switchToRandom() {
+                    this.currentMode = 'random';
+                    // 如果已有进度则保留，否则初始化
+                    if (!this.randomWord) {
+                        this.fetchNewRandomWord();
+                    }
+                },
+                async fetchNewRandomWord() {
+                    try {
+                        this.loading = true; this.error = null;
+                        const excludeStr = this.seenWordIds.join(',');
+                        const res = await axios.get(`http://localhost:3000/api/words/random?exclude=${excludeStr}`);
+                        if (res.data) {
+                            this.randomWord = res.data;
+                            this.randomTranslationVisible = false;
+                            if (!this.seenWordIds.includes(res.data.id)) {
+                                this.seenWordIds.push(res.data.id);
+                            }
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        if (err.response && err.response.status === 404) {
+                            this.error = '所有单词都已刷完啦！可以点左边的按钮复习';
+                        } else { this.error = '获取随机单词失败'; }
+                    } finally { this.loading = false; }
+                },
+                async reviewSeenWord() {
+                    if (this.seenWordIds.length === 0 || this.loading) return;
+                    try {
+                        this.loading = true; this.error = null;
+                        const seenStr = this.seenWordIds.join(',');
+                        const res = await axios.get(`http://localhost:3000/api/words/random/seen?seen=${seenStr}`);
+                        if (res.data) { this.randomWord = res.data; this.randomTranslationVisible = false; }
+                    } catch (err) { console.error(err); this.error = '获取已刷单词失败'; }
+                    finally { this.loading = false; }
+                },
+
+                // 拼写模式初始化：进入拼写模式时如果没有单词则获取第一个
+                initSpelling() {
+                    if (!this.spellingWord && this.total > 0) {
+                        axios.get('http://localhost:3000/api/words/current').then(res => {
+                            this.spellingWord = res.data;
+                            this.$nextTick(() => this.restoreWordState());
+                        });
+                    } else if (this.spellingWord) {
+                        // 切回拼写模式：优先恢复绿色通过状态，否则重新生成提示
+                        this.resetSpell();
+                        this.restoreWordState();
+                    }
+                },
+
+                // ===== AI 沟通模式 =====
+                switchToAi() {
+                    // 切换到 AI 沟通模式
+                    this.currentMode = 'ai';
+                    // 切换后自动聚焦输入框
+                    this.$nextTick(() => {
+                        if (this.$refs.aiChatInput) this.$refs.aiChatInput.focus();
+                    });
+                },
+                // 快捷按钮：根据类型发送预设问题
+                aiQuickAsk(type) {
+                    const prompts = {
+                        'explain': '请教我一个英语单词，我会输入单词名',
+                        'examples': '请给我一些常用的英语日常对话例句',
+                        'grammar': '请给我讲解一个常见的英语语法知识点',
+                        'translate': '请帮我翻译一句中文成英文'
+                    };
+                    // 将预设提示填入输入框，让用户可以修改后发送
+                    this.aiInput = prompts[type] || '';
+                    this.$nextTick(() => {
+                        if (this.$refs.aiChatInput) this.$refs.aiChatInput.focus();
+                    });
+                },
+                // 发送自由问答
+                async sendAiChat() {
+                    // 获取并校验输入
+                    const question = this.aiInput.trim();
+                    if (!question || this.aiLoading) return;
+                    // 添加用户消息到列表
+                    this.aiMessages.push({ role: 'user', content: question });
+                    this.aiInput = '';  // 清空输入框
+                    this.scrollAiToBottom();
+                    // 调用后端 AI 接口
+                    await this.callAiApi('http://localhost:3000/api/ai/chat', {
+                        word: '',
+                        meaning: '',
+                        question: question
+                    });
+                },
+                // 通用 AI 接口调用
+                async callAiApi(url, data) {
+                    try {
+                        this.aiLoading = true;
+                        // 先添加一个 loading 占位消息
+                        this.aiMessages.push({ role: 'assistant', content: '思考中...' });
+                        this.scrollAiToBottom();
+                        // 发送 POST 请求到后端
+                        const res = await axios.post(url, data);
+                        // 替换最后一条消息为 AI 的真实回复
+                        this.aiMessages[this.aiMessages.length - 1] = {
+                            role: 'assistant',
+                            content: res.data.answer
+                        };
+                    } catch (err) {
+                        // 请求失败时显示错误提示
+                        this.aiMessages[this.aiMessages.length - 1] = {
+                            role: 'assistant',
+                            content: '❌ 请求失败，请检查后端服务是否启动，以及 AI API Key 是否配置正确。'
+                        };
+                        console.error('AI 请求失败:', err);
+                    } finally {
+                        this.aiLoading = false;
+                        this.scrollAiToBottom();
+                    }
+                },
+                // 滚动 AI 消息列表到底部
+                scrollAiToBottom() {
+                    this.$nextTick(() => {
+                        const el = this.$refs.aiChatMessages;
+                        if (el) el.scrollTop = el.scrollHeight;
+                    });
+                },
+
+                // 隐藏侧边栏 + 显示 Toast
+                toggleSidebars() {
+                    this.sidebarsHidden = true;
+                    this.showToast('隐藏侧边栏成功，鼠标触碰任意侧边栏弹出');
+                },
+
+                // 鼠标触碰边界时显示侧边栏
+                showSidebars() {
+                    this.sidebarsHidden = false;
+                },
+
+                // Toast 提示（非弹窗，2秒后淡出）
+                showToast(message) {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastMessage = message;
+                    this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => {
+                        this.toastVisible = false;
+                    }, 2000);
+                },
+
+                // 切换到拼写模式时初始化
+                switchToSpelling() {
+                    if (this.currentMode === 'spelling') return; // 已在拼写模式，不重复初始化
+                    this.currentMode = 'spelling';
+                    this.initSpelling();
+                },
+
+                // ===== 收藏功能 =====
+                async checkFavoriteStatus(wordId) {
+                    // 检查单词是否已收藏
+                    if (!this.currentUser || !wordId) {
+                        return false;
+                    }
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/favorites/check', {
+                            user_id: this.currentUser.id,
+                            word_id: wordId
+                        });
+                        return res.data.is_favorited;
+                    } catch (err) {
+                        console.error('检查收藏状态失败:', err);
+                        return false;
+                    }
+                },
+                async toggleFavorite() {
+                    // 切换收藏状态
+                    if (!this.currentUser) {
+                        this.showToast('请先登录');
+                        return;
+                    }
+
+                    // 根据当前模式获取当前单词
+                    let currentWord = null;
+                    let isFavoriteState = null;
+
+                    if (this.currentMode === 'reading' && this.readingWord) {
+                        currentWord = this.readingWord;
+                        isFavoriteState = 'readingWordIsFavorite';
+                    } else if (this.currentMode === 'spelling' && this.spellingWord) {
+                        currentWord = this.spellingWord;
+                        isFavoriteState = 'spellingWordIsFavorite';
+                    } else if (this.currentMode === 'random' && this.randomWord) {
+                        currentWord = this.randomWord;
+                        isFavoriteState = 'randomWordIsFavorite';
+                    } else {
+                        return;
+                    }
+
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/favorites/toggle', {
+                            user_id: this.currentUser.id,
+                            word_id: currentWord.id
+                        });
+                        
+                        // 更新收藏状态
+                        this[isFavoriteState] = res.data.is_favorited;
+                        this.showToast(res.data.message);
+                    } catch (err) {
+                        console.error('切换收藏失败:', err);
+                        this.showToast('操作失败，请重试');
+                    }
+                },
+                openFavoritesModal() {
+                    // 打开收藏列表弹窗
+                    if (!this.currentUser) {
+                        this.showToast('请先登录');
+                        this.showLoginModal = true;
+                        return;
+                    }
+                    this.showFavoritesModal = true;
+                    this.fetchFavoritesList();
+                },
+                async fetchFavoritesList() {
+                    // 获取收藏列表
+                    if (!this.currentUser) return;
+
+                    try {
+                        this.favoritesLoading = true;
+                        const res = await axios.get(`http://localhost:3000/api/favorites/list/${this.currentUser.id}`);
+                        this.favoritesList = res.data.favorites;
+                    } catch (err) {
+                        console.error('获取收藏列表失败:', err);
+                        this.favoritesList = [];
+                        this.showToast('获取收藏列表失败');
+                    } finally {
+                        this.favoritesLoading = false;
+                    }
+                },
+                async deleteFavorite(wordId) {
+                    // 从收藏列表中删除单词（通过toggle接口实现）
+                    if (!this.currentUser) return;
+
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/favorites/toggle', {
+                            user_id: this.currentUser.id,
+                            word_id: wordId
+                        });
+                        
+                        // 从列表中移除该项
+                        this.favoritesList = this.favoritesList.filter(item => item.id !== wordId);
+                        this.showToast(res.data.message);
+                        
+                        // 实时更新当前单词的收藏状态
+                        if (this.currentMode === 'reading' && this.readingWord && this.readingWord.id === wordId) {
+                            this.readingWordIsFavorite = false;
+                        } else if (this.currentMode === 'spelling' && this.spellingWord && this.spellingWord.id === wordId) {
+                            this.spellingWordIsFavorite = false;
+                        } else if (this.currentMode === 'random' && this.randomWord && this.randomWord.id === wordId) {
+                            this.randomWordIsFavorite = false;
+                        }
+                    } catch (err) {
+                        console.error('取消收藏失败:', err);
+                        this.showToast('操作失败，请重试');
+                    }
+                },
+
+                // ===== 错题本功能 =====
+                async addMistake(wordId) {
+                    // 添加错题或增加错误次数
+                    if (!this.currentUser || !wordId) return;
+
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/mistakes/add', {
+                            user_id: this.currentUser.id,
+                            word_id: wordId
+                        });
+                        return res.data;
+                    } catch (err) {
+                        console.error('添加错题失败:', err);
+                        return null;
+                    }
+                },
+                async reduceMistake(wordId) {
+                    // 减少错误次数
+                    if (!this.currentUser || !wordId) return;
+
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/mistakes/reduce', {
+                            user_id: this.currentUser.id,
+                            word_id: wordId
+                        });
+                        return res.data;
+                    } catch (err) {
+                        console.error('减少错误次数失败:', err);
+                        return null;
+                    }
+                },
+                openMistakesModal() {
+                    // 打开错题本弹窗
+                    if (!this.currentUser) {
+                        this.showToast('请先登录');
+                        this.showLoginModal = true;
+                        return;
+                    }
+                    this.showMistakesModal = true;
+                    this.fetchMistakesList();
+                },
+                async fetchMistakesList() {
+                    // 获取错题列表
+                    if (!this.currentUser) return;
+
+                    try {
+                        this.mistakesLoading = true;
+                        const res = await axios.get(`http://localhost:3000/api/mistakes/list/${this.currentUser.id}`);
+                        this.mistakesList = res.data.mistakes;
+                    } catch (err) {
+                        console.error('获取错题列表失败:', err);
+                        this.mistakesList = [];
+                        this.showToast('获取错题列表失败');
+                    } finally {
+                        this.mistakesLoading = false;
+                    }
+                },
+                async deleteMistake(userId, wordId) {
+                    // 从错题本中删除单词
+                    if (!this.currentUser) return;
+
+                    try {
+                        const res = await axios.post('http://localhost:3000/api/mistakes/remove', {
+                            user_id: this.currentUser.id,
+                            word_id: wordId
+                        });
+                        
+                        // 从列表中移除该项
+                        this.mistakesList = this.mistakesList.filter(item => item.id !== wordId);
+                        this.showToast(res.data.message);
+                    } catch (err) {
+                        console.error('删除错题失败:', err);
+                        this.showToast('操作失败，请重试');
+                    }
+                }
+            },
+            mounted() {
+                this.fetchCurrentWord();
+                this.checkLoginStatus();
+            },
+            watch: {
+                // 监听阅读模式单词变化
+                readingWord: {
+                    handler(newWord) {
+                        if (newWord && this.currentUser) {
+                            this.checkFavoriteStatus(newWord.id).then(isFav => {
+                                this.readingWordIsFavorite = isFav;
+                            });
+                        } else {
+                            this.readingWordIsFavorite = false;
+                        }
+                    },
+                    immediate: true
+                },
+                // 监听拼写模式单词变化
+                spellingWord: {
+                    handler(newWord) {
+                        if (newWord && this.currentUser) {
+                            this.checkFavoriteStatus(newWord.id).then(isFav => {
+                                this.spellingWordIsFavorite = isFav;
+                            });
+                        } else {
+                            this.spellingWordIsFavorite = false;
+                        }
+                    },
+                    immediate: true
+                },
+                // 监听随机模式单词变化
+                randomWord: {
+                    handler(newWord) {
+                        if (newWord && this.currentUser) {
+                            this.checkFavoriteStatus(newWord.id).then(isFav => {
+                                this.randomWordIsFavorite = isFav;
+                            });
+                        } else {
+                            this.randomWordIsFavorite = false;
+                        }
+                    },
+                    immediate: true
+                },
+                // 监听用户登录状态变化
+                currentUser: {
+                    handler(newUser) {
+                        if (newUser) {
+                            // 用户登录后，检查当前单词的收藏状态
+                            if (this.readingWord) {
+                                this.checkFavoriteStatus(this.readingWord.id).then(isFav => {
+                                    this.readingWordIsFavorite = isFav;
+                                });
+                            }
+                            if (this.spellingWord) {
+                                this.checkFavoriteStatus(this.spellingWord.id).then(isFav => {
+                                    this.spellingWordIsFavorite = isFav;
+                                });
+                            }
+                            if (this.randomWord) {
+                                this.checkFavoriteStatus(this.randomWord.id).then(isFav => {
+                                    this.randomWordIsFavorite = isFav;
+                                });
+                            }
+                        } else {
+                            // 用户退出登录后，重置收藏状态
+                            this.readingWordIsFavorite = false;
+                            this.spellingWordIsFavorite = false;
+                            this.randomWordIsFavorite = false;
+                            this.favoritesList = [];
+                        }
+                    },
+                    immediate: true
+                },
+                currentMode(newVal, oldVal) {
+                    // 离开拼写模式时自动保存当前单词状态（包括红色"我不会"）
+                    if (oldVal === 'spelling' && newVal !== 'spelling') {
+                        this.saveCurrentWordState(true);
+                    }
+                    // 切换模式时，刷新当前单词的收藏状态
+                    if (this.currentUser) {
+                        if (this.readingWord) {
+                            this.checkFavoriteStatus(this.readingWord.id).then(isFav => {
+                                this.readingWordIsFavorite = isFav;
+                            });
+                        }
+                        if (this.spellingWord) {
+                            this.checkFavoriteStatus(this.spellingWord.id).then(isFav => {
+                                this.spellingWordIsFavorite = isFav;
+                            });
+                        }
+                        if (this.randomWord) {
+                            this.checkFavoriteStatus(this.randomWord.id).then(isFav => {
+                                this.randomWordIsFavorite = isFav;
+                            });
+                        }
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
