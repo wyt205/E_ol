@@ -161,10 +161,12 @@
                     <div class="words-table-wrap">
                         <div v-if="words.length === 0" class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">该词表暂无单词</div></div>
                         <table v-else class="words-table">
-                            <thead><tr><th style="width:50px">#</th><th style="width:140px">单词</th><th style="width:140px">音标</th><th>释义</th><th>例句</th><th>例句翻译</th><th style="width:120px">操作</th></tr></thead>
+                            <thead><tr><th style="width:50px">#</th><th style="width:140px">单词</th><th style="width:150px">音标 (UK)</th><th style="width:150px">音标 (US)</th><th>释义</th><th>例句</th><th>例句翻译</th><th style="width:120px">操作</th></tr></thead>
                             <tbody>
                                 <tr v-for="(w, index) in words" :key="w.id">
-                                    <td>{{ index + 1 }}</td><td class="word-cell">{{ w.word }}</td><td class="phonetic-cell">{{ w.phonetic || '-' }}</td>
+                                    <td>{{ index + 1 }}</td><td class="word-cell">{{ w.word }}</td>
+                                    <td class="phonetic-cell">{{ w.phonetic_uk || '-' }}</td>
+                                    <td class="phonetic-cell">{{ w.phonetic_us || '-' }}</td>
                                     <td class="meaning-cell">{{ w.meaning }}</td><td class="example-cell">{{ w.example || '-' }}</td><td class="example-cell">{{ w.example_translation || '-' }}</td>
                                     <td><div class="action-cell"><button class="btn-edit" @click="openEditWord(w)">编辑</button><button class="btn-delete" @click="confirmDeleteWord(w)">删除</button></div></td>
                                 </tr>
@@ -201,7 +203,8 @@
             <div class="modal">
                 <div class="modal-title">{{ wordModalMode === 'create' ? '添加单词' : '编辑单词' }}</div>
                 <div class="form-group"><label class="form-label">单词 *</label><input class="form-input" v-model="wordForm.word" placeholder="例如：abandon" /></div>
-                <div class="form-group"><label class="form-label">音标</label><input class="form-input" v-model="wordForm.phonetic" placeholder="例如：/əˈbændən/" /></div>
+                <div class="form-group"><label class="form-label">音标 (UK)</label><input class="form-input" v-model="wordForm.phonetic_uk" placeholder="例如：/əˈbændən/" /></div>
+                <div class="form-group"><label class="form-label">音标 (US)</label><input class="form-input" v-model="wordForm.phonetic_us" placeholder="例如：/əˈbændər/" /></div>
                 <div class="form-group"><label class="form-label">释义 *</label><textarea class="form-textarea" v-model="wordForm.meaning" placeholder="例如：v. 放弃；抛弃"></textarea></div>
                 <div class="form-group"><label class="form-label">例句</label><textarea class="form-textarea" v-model="wordForm.example" placeholder="例如：He abandoned his plan."></textarea></div>
                 <div class="form-group"><label class="form-label">例句翻译</label><textarea class="form-textarea" v-model="wordForm.example_translation" placeholder="例如：他放弃了计划。"></textarea></div>
@@ -230,7 +233,7 @@
                     lists: [], selectedList: null, words: [],
                     listModalVisible: false, listModalMode: 'create', listForm: { id: null, name: '', description: '' },
                     deleteListModalVisible: false, deleteListTarget: {},
-                    wordModalVisible: false, wordModalMode: 'create', wordForm: { id: null, word: '', phonetic: '', meaning: '', example: '', example_translation: '' },
+                    wordModalVisible: false, wordModalMode: 'create', wordForm: { id: null, word: '', phonetic_uk: '', phonetic_us: '', meaning: '', example: '', example_translation: '' },
                     deleteWordModalVisible: false, deleteWordTarget: {},
                     toastVisible: false, toastMessage: '', toastType: 'success', toastTimer: null
                 };
@@ -264,14 +267,14 @@
                         if (this.selectedList?.id === this.deleteListTarget.id) { this.selectedList = null; this.words = []; } await this.fetchLists();
                     } catch { this.showToast('删除失败', 'error'); }
                 },
-                openCreateWord() { this.wordModalMode = 'create'; this.wordForm = { id: null, word: '', phonetic: '', meaning: '', example: '', example_translation: '' }; this.wordModalVisible = true; },
-                openEditWord(w) { this.wordModalMode = 'edit'; this.wordForm = { id: w.id, word: w.word, phonetic: w.phonetic||'', meaning: w.meaning, example: w.example||'', example_translation: w.example_translation||'' }; this.wordModalVisible = true; },
+                openCreateWord() { this.wordModalMode = 'create'; this.wordForm = { id: null, word: '', phonetic_uk: '', phonetic_us: '', meaning: '', example: '', example_translation: '' }; this.wordModalVisible = true; },
+                openEditWord(w) { this.wordModalMode = 'edit'; this.wordForm = { id: w.id, word: w.word, phonetic_uk: w.phonetic_uk||'', phonetic_us: w.phonetic_us||'', meaning: w.meaning, example: w.example||'', example_translation: w.example_translation||'' }; this.wordModalVisible = true; },
                 async submitWordForm() {
                     if (!this.wordForm.word.trim()) { this.showToast('请输入单词', 'error'); return; }
                     if (!this.wordForm.meaning.trim()) { this.showToast('请输入释义', 'error'); return; }
                     try {
                         if (this.wordModalMode === 'create') await axios.post(`${API_BASE}/words`, { list_id: this.selectedList.id, ...this.wordForm });
-                        else await axios.put(`${API_BASE}/words/${this.wordForm.id}`, { word: this.wordForm.word.trim(), phonetic: this.wordForm.phonetic.trim(), meaning: this.wordForm.meaning.trim(), example: this.wordForm.example.trim(), example_translation: this.wordForm.example_translation.trim() });
+                        else await axios.put(`${API_BASE}/words/${this.wordForm.id}`, { word: this.wordForm.word.trim(), phonetic_uk: this.wordForm.phonetic_uk.trim(), phonetic_us: this.wordForm.phonetic_us.trim(), meaning: this.wordForm.meaning.trim(), example: this.wordForm.example.trim(), example_translation: this.wordForm.example_translation.trim() });
                         this.showToast(this.wordModalMode === 'create' ? '单词添加成功' : '单词更新成功', 'success');
                         this.wordModalVisible = false; await this.fetchWords(); await this.fetchLists();
                     } catch (err) { this.showToast(err.response?.data?.detail || '操作失败', 'error'); }

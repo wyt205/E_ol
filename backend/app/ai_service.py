@@ -7,7 +7,7 @@ from zai import ZhipuAiClient
 
 # 初始化智谱 AI 客户端
 # api_key 需要用户自行到 https://open.bigmodel.cn/ 申请
-client = ZhipuAiClient(api_key="")  # TODO: 替换为你的 API Key
+client = ZhipuAiClient(api_key="53ef144b4a074972b1a621f422af59a0.B7vlxuCREvZUnBdg")  # TODO: 替换为你的 API Key
 
 
 def ask_ai(messages: list, use_thinking: bool = False) -> str:
@@ -21,7 +21,7 @@ def ask_ai(messages: list, use_thinking: bool = False) -> str:
     """
     # 构造请求参数
     kwargs = {
-        "model": "glm-4.7-flash",          # 免费模型，速度快
+        "model": "glm-4.7-flash",            # 免费模型
         "messages": messages,                # 对话消息
         "max_tokens": 4096,                  # 最大输出 token 数
         "temperature": 0.7                   # 控制随机性，0.7 适合教学场景

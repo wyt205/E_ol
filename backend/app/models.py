@@ -74,7 +74,10 @@ class Word(Base):
     id = Column(Integer, primary_key=True, index=True, comment="单词ID")
     list_id = Column(Integer, ForeignKey("word_lists.id"), nullable=False, default=1, comment="所属词表ID")
     word = Column(String(100), nullable=False, comment="单词")
-    phonetic = Column(String(100), comment="音标")
+    phonetic_uk = Column(String(100), comment="UK音标")
+    phonetic_us = Column(String(100), comment="US音标")
+    audio_url_uk = Column(String(500), comment="UK语音URL")
+    audio_url_us = Column(String(500), comment="US语音URL")
     meaning = Column(Text, nullable=False, comment="释义")
     example = Column(Text, comment="例句")
     example_translation = Column(Text, comment="例句翻译")
@@ -86,7 +89,10 @@ class Word(Base):
             "id": self.id,
             "list_id": self.list_id,
             "word": self.word,
-            "phonetic": self.phonetic,
+            "phonetic_uk": self.phonetic_uk,
+            "phonetic_us": self.phonetic_us,
+            "audio_url_uk": self.audio_url_uk,
+            "audio_url_us": self.audio_url_us,
             "meaning": self.meaning,
             "example": self.example,
             "example_translation": self.example_translation,
