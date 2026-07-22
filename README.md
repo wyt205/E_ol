@@ -28,10 +28,14 @@
 │   │   └── management_words.html
 │   ├── main.py                 # FastAPI 主应用入口
 │   ├── requirements.txt        # Python 依赖
-│   └── start.py                # 后端启动脚本
+│   └── b_start.py              # 后端启动脚本
 ├── frontend/                   # 前端目录
+    ├── js/                     # JS目录
+    │   ├── app.js
+    ├── css/                    # CSS目录
+    │   ├── style.css           
 │   ├── index.html              # 主学习页面（Vue.js 单页应用）
-│   └── start.py                # 前端启动脚本
+│   └── f_start.py              # 前端启动脚本
 ├── crawl_dictionary.py         # 单词数据爬虫
 ├── word_learning.sql           # 数据库初始化脚本
 ├── words_insert.sql            # 单词数据 SQL（爬虫生成）
